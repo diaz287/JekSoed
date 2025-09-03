@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "665638892984",
+    "project_id": "jeksoed",
+    "storage_bucket": "jeksoed.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:665638892984:android:6fbf22d0a3ed60f523cb4d",
+        "android_client_info": {
+          "package_name": "com.example.jeksoed"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDGr7ylyRKovagTH7E9vFgA1L7YvEIaFpI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
