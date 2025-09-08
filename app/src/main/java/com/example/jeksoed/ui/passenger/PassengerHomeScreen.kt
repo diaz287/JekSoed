@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import com.example.jeksoed.model.RouteInfo
+import com.example.jeksoed.navigation.Screen
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
@@ -80,12 +81,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import com.google.firebase.Timestamp
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 
 @Composable
 fun PassengerHomeScreen(navController: NavController) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val keyboardController = LocalSoftwareKeyboardController.current
+    var isCreatingOrder by remember { mutableStateOf(false) }
 
     val placesClient: PlacesClient = remember { com.google.android.libraries.places.api.Places.createClient(context) }
 
@@ -330,10 +335,56 @@ fun PassengerHomeScreen(navController: NavController) {
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(
-                        onClick = { /* TODO: Logika untuk memesan ojek */ },
-                        modifier = Modifier.fillMaxWidth()
+                        onClick = {
+                            if (userLocation != null && destinationLocation != null && routeInfo != null) {
+                                isCreatingOrder = true
+                                // Kumpulkan data untuk disimpan ke Firestore
+                                val rideRequest = hashMapOf(
+                                    "passengerId" to FirebaseAuth.getInstance().currentUser?.uid,
+                                    "pickupLocation" to hashMapOf(
+                                        "latitude" to userLocation!!.latitude,
+                                        "longitude" to userLocation!!.longitude
+                                    ),
+                                    "destinationLocation" to hashMapOf(
+                                        "latitude" to destinationLocation!!.latitude,
+                                        "longitude" to destinationLocation!!.longitude
+                                    ),
+                                    "distance" to routeInfo!!.distance,
+                                    "duration" to routeInfo!!.duration,
+                                    "status" to "pending", // Status awal
+                                    "createdAt" to Timestamp.now(),
+                                    "driverId" to null
+                                )
+
+                                // Simpan ke Firestore
+                                val db = FirebaseFirestore.getInstance()
+                                db.collection("ride_requests")
+                                    .add(rideRequest)
+                                    .addOnSuccessListener { documentReference ->
+                                        isCreatingOrder = false
+                                        navController.navigate(Screen.FindingDriver.createRoute(documentReference.id)) {
+                                            popUpTo(Screen.PassengerHome.route) { inclusive = true }
+                                        }
+                                    }
+                                    .addOnFailureListener { e ->
+                                        isCreatingOrder = false
+                                        Log.w("Firestore", "Error adding document", e)
+                                        Toast.makeText(context, "Gagal membuat permintaan: ${e.message}", Toast.LENGTH_LONG).show()
+                                    }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isCreatingOrder
                     ) {
-                        Text("Pesan Sekarang")
+                        if (isCreatingOrder) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = Color.White,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text("Pesan Sekarang")
+                        }
                     }
                 }
             }

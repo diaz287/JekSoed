@@ -9,6 +9,7 @@ import com.example.jeksoed.ui.auth.LoginScreen
 import com.example.jeksoed.ui.auth.RegisterScreen
 import com.example.jeksoed.ui.passenger.PassengerHomeScreen
 import com.example.jeksoed.ui.driver.DriverHomeScreen
+import com.example.jeksoed.ui.passenger.FindingDriverScreen
 
 sealed class Screen(val route: String) {
     object Splash : Screen("splash")
@@ -16,6 +17,9 @@ sealed class Screen(val route: String) {
     object Register : Screen("register")
     object PassengerHome : Screen("passenger_home")
     object DriverHome : Screen("driver_home")
+    object FindingDriver : Screen("finding_driver/{rideRequestId}") {
+        fun createRoute(rideRequestId: String) = "finding_driver/$rideRequestId"
+    }
 }
 
 @Composable
@@ -27,5 +31,16 @@ fun AppNavigation() {
         composable(Screen.Register.route) { RegisterScreen(navController) }
         composable(Screen.PassengerHome.route) { PassengerHomeScreen(navController) }
         composable(Screen.DriverHome.route) { DriverHomeScreen(navController) }
+        composable(Screen.FindingDriver.route) { backStackEntry ->
+            val rideRequestId = backStackEntry.arguments?.getString("rideRequestId")
+            if (rideRequestId != null) {
+                FindingDriverScreen(navController = navController, rideRequestId = rideRequestId)
+            } else {
+                // Handle kasus jika ID tidak ada, misal kembali ke login
+                navController.navigate(Screen.Login.route) {
+                    popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                }
+            }
+        }
     }
 }
