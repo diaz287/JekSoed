@@ -1,4 +1,4 @@
-package com.example.jeksoed.ui.passenger
+package com.example.jeksoed.ui.screens.passenger
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -57,12 +57,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
-import com.example.jeksoed.model.RouteInfo
+import com.example.jeksoed.data.model.RouteInfo
 import com.example.jeksoed.navigation.Screen
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
+import com.google.android.libraries.places.api.Places
 import com.google.android.libraries.places.api.model.AutocompletePrediction
 import com.google.android.libraries.places.api.model.Place
 import com.google.android.libraries.places.api.net.FetchPlaceRequest
@@ -84,6 +86,7 @@ import kotlinx.coroutines.withContext
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.delay
 
 @Composable
 fun PassengerHomeScreen(navController: NavController) {
@@ -92,7 +95,7 @@ fun PassengerHomeScreen(navController: NavController) {
     val keyboardController = LocalSoftwareKeyboardController.current
     var isCreatingOrder by remember { mutableStateOf(false) }
 
-    val placesClient: PlacesClient = remember { com.google.android.libraries.places.api.Places.createClient(context) }
+    val placesClient: PlacesClient = remember { Places.createClient(context) }
 
     // --- State Management ---
     var hasLocationPermission by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) }
@@ -133,7 +136,7 @@ fun PassengerHomeScreen(navController: NavController) {
         if (searchQuery.length > 2) {
             isSearching = true
             // Debounce: Tunda 300ms sebelum benar-benar mencari
-            kotlinx.coroutines.delay(300L)
+            delay(300L)
             try {
                 val request = FindAutocompletePredictionsRequest.builder()
                     .setQuery(searchQuery)
@@ -199,11 +202,11 @@ fun PassengerHomeScreen(navController: NavController) {
                 .include(destinationLocation!!)
                 .build()
             cameraPositionState.animate(
-                com.google.android.gms.maps.CameraUpdateFactory.newLatLngBounds(bounds, 150) // padding 150px
+                CameraUpdateFactory.newLatLngBounds(bounds, 150) // padding 150px
             )
         } else if (userLocation != null) {
             cameraPositionState.animate(
-                com.google.android.gms.maps.CameraUpdateFactory.newLatLngZoom(userLocation!!, 15f)
+                CameraUpdateFactory.newLatLngZoom(userLocation!!, 15f)
             )
         }
     }

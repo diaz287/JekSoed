@@ -1,4 +1,4 @@
-package com.example.jeksoed.ui.driver
+package com.example.jeksoed.ui.screens.driver
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

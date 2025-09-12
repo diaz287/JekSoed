@@ -1,4 +1,4 @@
-package com.example.jeksoed.model
+package com.example.jeksoed.data.model
 
 import com.google.android.gms.maps.model.LatLng
 import kotlinx.serialization.SerialName

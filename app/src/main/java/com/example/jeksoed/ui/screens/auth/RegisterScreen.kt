@@ -1,4 +1,4 @@
-package com.example.jeksoed.ui.auth
+package com.example.jeksoed.ui.screens.auth
 
 import android.widget.Toast
 import androidx.compose.foundation.clickable
@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.jeksoed.navigation.Screen
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 
 @Composable
@@ -80,7 +81,7 @@ fun RegisterScreen(navController: NavController) {
                                         "nama" to name,
                                         "email" to email,
                                         "role" to selectedRole,
-                                        "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
+                                        "createdAt" to FieldValue.serverTimestamp()
                                     )
                                     firestore.collection("users").document(uid).set(userMap)
                                         .addOnSuccessListener {

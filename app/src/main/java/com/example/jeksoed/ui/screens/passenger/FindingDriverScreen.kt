@@ -1,4 +1,4 @@
-package com.example.jeksoed.ui.passenger
+package com.example.jeksoed.ui.screens.passenger
 
 import android.util.Log
 import android.widget.Toast

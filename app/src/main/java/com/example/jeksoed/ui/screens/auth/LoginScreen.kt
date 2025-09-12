@@ -1,4 +1,4 @@
-package com.example.jeksoed.ui.auth
+package com.example.jeksoed.ui.screens.auth
 
 import android.widget.Toast
 import androidx.compose.foundation.clickable
@@ -28,7 +28,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import com.example.jeksoed.navigation.Screen
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
