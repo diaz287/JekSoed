@@ -16,16 +16,26 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.example.jeksoed.navigation.Screen
+import com.example.jeksoed.ui.theme.JekSoedTheme
 import com.google.firebase.firestore.FirebaseFirestore
 
+/**
+ * =================================================================================
+ * SMART COMPOSABLE
+ * - Menangani logic dan side-effect (Listener Firestore & Navigasi).
+ * =================================================================================
+ */
 @Composable
 fun FindingDriverScreen(navController: NavController, rideRequestId: String) {
     val context = LocalContext.current
 
-    // Snapshot Listener yang akan terus mengamati dokumen pesanan
-    DisposableEffect(Unit) {
+    // Snapshot Listener yang akan terus mengamati dokumen pesanan.
+    // rideRequestId digunakan sebagai 'key' agar effect dijalankan ulang jika ID berubah.
+    DisposableEffect(rideRequestId) {
         val db = FirebaseFirestore.getInstance()
         val rideRequestRef = db.collection("ride_requests").document(rideRequestId)
 
@@ -42,7 +52,11 @@ fun FindingDriverScreen(navController: NavController, rideRequestId: String) {
                 // Cek jika driver sudah ditemukan
                 if (status == "accepted" && driverId != null) {
                     Toast.makeText(context, "Driver ditemukan!", Toast.LENGTH_LONG).show()
-                    // TODO: Navigasi ke halaman perjalanan (TripScreen)
+
+                    // TODO: Ganti dengan navigasi ke TripScreen/OnGoingRideScreen
+                    // Contoh: navController.navigate(Screen.Trip.createRoute(rideRequestId, driverId)) {
+                    //     popUpTo(Screen.FindingDriver.route) { inclusive = true }
+                    // }
                 }
             }
         }
@@ -53,7 +67,19 @@ fun FindingDriverScreen(navController: NavController, rideRequestId: String) {
         }
     }
 
-    // UI Sederhana untuk layar tunggu
+    // Memanggil Composable UI yang "bodoh"
+    FindingDriverScreenUI()
+}
+
+/**
+ * =================================================================================
+ * DUMB UI COMPOSABLE
+ * - Hanya menampilkan UI statis.
+ * - Tidak memiliki state atau logic sama sekali.
+ * =================================================================================
+ */
+@Composable
+private fun FindingDriverScreenUI() {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -66,5 +92,18 @@ fun FindingDriverScreen(navController: NavController, rideRequestId: String) {
                 style = MaterialTheme.typography.titleLarge
             )
         }
+    }
+}
+
+/**
+ * =================================================================================
+ * PREVIEW
+ * =================================================================================
+ */
+@Preview(showBackground = true, showSystemUi = true)
+@Composable
+private fun FindingDriverScreenPreview() {
+    JekSoedTheme {
+        FindingDriverScreenUI()
     }
 }
