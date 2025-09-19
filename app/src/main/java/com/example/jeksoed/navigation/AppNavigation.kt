@@ -4,13 +4,12 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.jeksoed.ui.splash.SplashScreen
-import com.example.jeksoed.ui.auth.LoginScreen
-import com.example.jeksoed.ui.auth.RegisterScreen
-import com.example.jeksoed.ui.passenger.PassengerHomeScreen
-import com.example.jeksoed.ui.driver.DriverHomeScreen
-import com.example.jeksoed.ui.passenger.FindingDriverScreen
-import com.example.jeksoed.ui.trip.TripScreen
+import com.example.jeksoed.ui.screens.splash.SplashScreen
+import com.example.jeksoed.ui.screens.auth.LoginScreen
+import com.example.jeksoed.ui.screens.auth.RegisterScreen
+import com.example.jeksoed.ui.screens.passenger.PassengerHomeScreen
+import com.example.jeksoed.ui.screens.driver.DriverHomeScreen
+import com.example.jeksoed.ui.screens.passenger.FindingDriverScreen
 
 sealed class Screen(val route: String) {
     object Splash : Screen("splash")
@@ -20,9 +19,6 @@ sealed class Screen(val route: String) {
     object DriverHome : Screen("driver_home")
     object FindingDriver : Screen("finding_driver/{rideRequestId}") {
         fun createRoute(rideRequestId: String) = "finding_driver/$rideRequestId"
-    }
-    object Trip : Screen("trip/{rideRequestId}") {
-        fun createRoute(rideRequestId: String) = "trip/$rideRequestId"
     }
 }
 
@@ -44,12 +40,6 @@ fun AppNavigation() {
                 navController.navigate(Screen.Login.route) {
                     popUpTo(navController.graph.startDestinationId) { inclusive = true }
                 }
-            }
-        }
-        composable(Screen.Trip.route) { backStackEntry ->
-            val rideRequestId = backStackEntry.arguments?.getString("rideRequestId")
-            if (rideRequestId != null) {
-                TripScreen(navController = navController, rideRequestId = rideRequestId)
             }
         }
     }
