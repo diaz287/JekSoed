@@ -26,19 +26,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import com.example.jeksoed.model.RideRequest
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
-
-data class RideRequest(
-    val id: String = "", // ID Dokumen Firestore
-    val passengerId: String = "",
-    val pickupLocation: Map<String, Double> = emptyMap(),
-    val destinationLocation: Map<String, Double> = emptyMap(),
-    val distance: String = "",
-    val duration: String = "",
-    val status: String = "",
-    val createdAt: Timestamp? = null
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -105,7 +95,7 @@ fun DriverHomeScreen(navController: NavController) {
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(rideRequests) { request ->
-                        RideRequestCard(rideRequest = request)
+                        RideRequestCard(rideRequest = request, navController = navController)
                     }
                 }
             }
@@ -114,7 +104,7 @@ fun DriverHomeScreen(navController: NavController) {
 }
 
 @Composable
-fun RideRequestCard(rideRequest: RideRequest) {
+fun RideRequestCard(rideRequest: RideRequest, navController: NavController) {
     val context = LocalContext.current
     var isAccepting by remember { mutableStateOf(false) }
 
@@ -147,6 +137,7 @@ fun RideRequestCard(rideRequest: RideRequest) {
                         .addOnSuccessListener {
                             isAccepting = false
                             Toast.makeText(context, "Orderan berhasil diambil!", Toast.LENGTH_SHORT).show()
+                            navController.navigate(Screen.Trip.createRoute(rideRequest.id))
                         }
                         .addOnFailureListener { e ->
                             isAccepting = false

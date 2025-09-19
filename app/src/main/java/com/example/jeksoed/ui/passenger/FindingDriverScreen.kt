@@ -6,11 +6,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.Button
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
@@ -18,6 +20,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.example.jeksoed.navigation.Screen
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
 @Composable
@@ -41,8 +45,9 @@ fun FindingDriverScreen(navController: NavController, rideRequestId: String) {
 
                 // Cek jika driver sudah ditemukan
                 if (status == "accepted" && driverId != null) {
-                    Toast.makeText(context, "Driver ditemukan!", Toast.LENGTH_LONG).show()
-                    // TODO: Navigasi ke halaman perjalanan (TripScreen)
+                    navController.navigate(Screen.Trip.createRoute(rideRequestId)) {
+                        popUpTo(Screen.FindingDriver.route) { inclusive = true }
+                    }
                 }
             }
         }
@@ -65,6 +70,20 @@ fun FindingDriverScreen(navController: NavController, rideRequestId: String) {
                 text = "Mencari Driver Terdekat...",
                 style = MaterialTheme.typography.titleLarge
             )
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Tombol Logout
+            Button(
+                onClick = {
+                    FirebaseAuth.getInstance().signOut()
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.FindingDriver.route) { inclusive = true }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Logout")
+            }
         }
     }
 }

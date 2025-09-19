@@ -177,7 +177,8 @@ fun PassengerHomeScreen(navController: NavController) {
                         routeInfo = RouteInfo(
                             distance = leg.distance.humanReadable,
                             duration = leg.duration.humanReadable,
-                            polylinePoints = points
+                            polylinePoints = points,
+                            encodedPath = route.overviewPolyline.encodedPath
                         )
                     } else {
                         Toast.makeText(context, "Tidak dapat menemukan rute.", Toast.LENGTH_SHORT).show()
@@ -353,7 +354,8 @@ fun PassengerHomeScreen(navController: NavController) {
                                     "duration" to routeInfo!!.duration,
                                     "status" to "pending", // Status awal
                                     "createdAt" to Timestamp.now(),
-                                    "driverId" to null
+                                    "driverId" to null,
+                                    "encodedPolyline" to routeInfo!!.encodedPath
                                 )
 
                                 // Simpan ke Firestore
