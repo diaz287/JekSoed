@@ -51,12 +51,9 @@ fun FindingDriverScreen(navController: NavController, rideRequestId: String) {
 
                 // Cek jika driver sudah ditemukan
                 if (status == "accepted" && driverId != null) {
-                    Toast.makeText(context, "Driver ditemukan!", Toast.LENGTH_LONG).show()
-
-                    // TODO: Ganti dengan navigasi ke TripScreen/OnGoingRideScreen
-                    // Contoh: navController.navigate(Screen.Trip.createRoute(rideRequestId, driverId)) {
-                    //     popUpTo(Screen.FindingDriver.route) { inclusive = true }
-                    // }
+                    navController.navigate(Screen.Trip.createRoute(rideRequestId)) {
+                        popUpTo(Screen.FindingDriver.route) { inclusive = true }
+                    }
                 }
             }
         }

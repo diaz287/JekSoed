@@ -14,23 +14,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.example.jeksoed.data.model.RideRequest
 import com.example.jeksoed.navigation.Screen
 import com.example.jeksoed.ui.theme.JekSoedTheme
-import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 
-data class RideRequest(
-    val id: String = "",
-    val passengerId: String = "",
-    val pickupLocation: Map<String, Double> = emptyMap(),
-    val destinationLocation: Map<String, Double> = emptyMap(),
-    val distance: String = "",
-    val duration: String = "",
-    val status: String = "",
-    val createdAt: Timestamp? = null
-)
 
 /**
  * SMART COMPOSABLE
@@ -91,7 +81,8 @@ fun DriverHomeScreen(
             navController.navigate(Screen.Login.route) {
                 popUpTo(Screen.DriverHome.route) { inclusive = true }
             }
-        }
+        },
+        navController = navController
     )
 }
 
@@ -108,7 +99,8 @@ fun DriverHomeScreenUI(
     isLoading: Boolean,
     acceptingRideId: String?,
     onAcceptRide: (rideId: String) -> Unit,
-    onLogoutClick: () -> Unit
+    onLogoutClick: () -> Unit,
+    navController: NavController
 ) {
     Scaffold(
         topBar = {
@@ -139,7 +131,8 @@ fun DriverHomeScreenUI(
                         RideRequestCard(
                             rideRequest = request,
                             isAccepting = (acceptingRideId == request.id),
-                            onAcceptClick = { onAcceptRide(request.id) }
+                            onAcceptClick = { onAcceptRide(request.id) },
+                            navController = navController
                         )
                     }
                 }
@@ -157,7 +150,8 @@ fun DriverHomeScreenUI(
 fun RideRequestCard(
     rideRequest: RideRequest,
     isAccepting: Boolean,
-    onAcceptClick: () -> Unit
+    onAcceptClick: () -> Unit,
+    navController: NavController
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -203,7 +197,8 @@ private fun DriverHomeScreenPreview() {
             isLoading = false,
             acceptingRideId = "2", // Contoh jika orderan kedua sedang di-accept
             onAcceptRide = {},
-            onLogoutClick = {}
+            onLogoutClick = {},
+            navController = NavController(LocalContext.current)
         )
     }
 }

@@ -10,6 +10,7 @@ import com.example.jeksoed.ui.screens.auth.RegisterScreen
 import com.example.jeksoed.ui.screens.passenger.PassengerHomeScreen
 import com.example.jeksoed.ui.screens.driver.DriverHomeScreen
 import com.example.jeksoed.ui.screens.passenger.FindingDriverScreen
+import com.example.jeksoed.ui.screens.trip.TripScreen
 
 sealed class Screen(val route: String) {
     object Splash : Screen("splash")
@@ -19,6 +20,9 @@ sealed class Screen(val route: String) {
     object DriverHome : Screen("driver_home")
     object FindingDriver : Screen("finding_driver/{rideRequestId}") {
         fun createRoute(rideRequestId: String) = "finding_driver/$rideRequestId"
+    }
+    object Trip : Screen("trip/{rideRequestId}") {
+        fun createRoute(rideRequestId: String) = "trip/$rideRequestId"
     }
 }
 
@@ -40,6 +44,12 @@ fun AppNavigation() {
                 navController.navigate(Screen.Login.route) {
                     popUpTo(navController.graph.startDestinationId) { inclusive = true }
                 }
+            }
+        }
+        composable(Screen.Trip.route) { backStackEntry ->
+            val rideRequestId = backStackEntry.arguments?.getString("rideRequestId")
+            if (rideRequestId != null) {
+                TripScreen(navController = navController, rideRequestId = rideRequestId)
             }
         }
     }

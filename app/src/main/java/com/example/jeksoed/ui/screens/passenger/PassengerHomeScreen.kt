@@ -33,6 +33,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -186,7 +187,8 @@ fun PassengerHomeScreen(
                         routeInfo = RouteInfo(
                             distance = leg.distance.humanReadable,
                             duration = leg.duration.humanReadable,
-                            polylinePoints = points
+                            polylinePoints = points,
+                            encodedPath = route.overviewPolyline.encodedPath
                         )
                     } else {
                         Toast.makeText(context, "Tidak dapat menemukan rute.", Toast.LENGTH_SHORT).show()
@@ -258,7 +260,8 @@ fun PassengerHomeScreen(
                     "duration" to routeInfo!!.duration,
                     "status" to "pending",
                     "createdAt" to Timestamp.now(),
-                    "driverId" to null
+                    "driverId" to null,
+                    "encodedPolyline" to routeInfo!!.encodedPath
                 )
                 firestore.collection("ride_requests").add(rideRequest)
                     .addOnSuccessListener { docRef ->
@@ -421,7 +424,7 @@ private fun SearchUI(
                         Text(prediction.getPrimaryText(null).toString(), fontWeight = FontWeight.Bold)
                         Text(prediction.getSecondaryText(null).toString(), fontSize = 12.sp)
                     }
-                    Divider()
+                    HorizontalDivider()
                 }
             }
         }
@@ -486,7 +489,7 @@ private data class DummyPrediction(
 // Data palsu untuk digunakan di berbagai preview
 private val DUMMY_USER_LOCATION = LatLng(-7.431, 109.245) // Purwokerto
 private val DUMMY_DESTINATION_LOCATION = LatLng(-7.420, 109.255)
-private val DUMMY_ROUTE_INFO = RouteInfo(distance = "5.2 km", duration = "15 min", polylinePoints = emptyList())
+private val DUMMY_ROUTE_INFO = RouteInfo(distance = "5.2 km", duration = "15 min", polylinePoints = emptyList(), encodedPath = "dummy_encoded_path_string")
 private val DUMMY_PREDICTIONS = listOf(
     DummyPrediction("Alun-Alun Purwokerto", "Jl. Jend. Soedirman, Purwokerto"),
     DummyPrediction("Stasiun Purwokerto", "Jl. Stasiun, Kober, Purwokerto Barat"),
@@ -581,7 +584,7 @@ private fun SearchUI_Preview_WithPredictions() {
                         Text(prediction.primaryText, fontWeight = FontWeight.Bold)
                         Text(prediction.secondaryText, fontSize = 12.sp)
                     }
-                    Divider()
+                    HorizontalDivider()
                 }
             }
         }
