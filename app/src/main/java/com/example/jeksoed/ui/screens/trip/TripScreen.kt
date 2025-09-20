@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.jeksoed.data.model.RideRequest
+import com.example.jeksoed.navigation.Screen
 import com.example.jeksoed.ui.theme.JekSoedTheme
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
@@ -45,13 +46,30 @@ fun TripScreen(
         }
     }
 
-    TripScreenContent(uiState = uiState)
+    TripScreenContent(
+        uiState = uiState,
+        cameraPositionState = rememberCameraPositionState(),
+        onUpdateStatus = { newStatus ->
+            viewModel.updateTripStatus(newStatus)
+        },
+        onLogoutClick = {
+            viewModel.logout()
+            navController.navigate(Screen.Login.route) {
+                popUpTo(Screen.Trip.route) { inclusive = true }
+            }
+        }
+    )
 }
 
 // Composable yang hanya bertugas menampilkan UI
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TripScreenContent(uiState: TripUiState) {
-    val cameraPositionState = rememberCameraPositionState()
+fun TripScreenContent(
+    uiState: TripUiState,
+    cameraPositionState: CameraPositionState,
+    onUpdateStatus: (String) -> Unit,
+    onLogoutClick: () -> Unit
+) {
 
     // Efek untuk menyesuaikan kamera
     LaunchedEffect(uiState.polylinePoints) {
@@ -63,73 +81,134 @@ fun TripScreenContent(uiState: TripUiState) {
             )
         }
     }
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Trip") },
+                actions = { Button(onClick = onLogoutClick) { Text("Logout") } }
+            )
+        }
+    ) { paddingValues ->
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        GoogleMap(
-            modifier = Modifier.fillMaxSize(),
-            cameraPositionState = cameraPositionState
-        ) {
-            if (uiState.polylinePoints.isNotEmpty()) {
-                Polyline(points = uiState.polylinePoints, color = Color.Blue, width = 15f)
+        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+            GoogleMap(
+                modifier = Modifier.fillMaxSize(),
+                cameraPositionState = cameraPositionState
+            ) {
+                if (uiState.polylinePoints.isNotEmpty()) {
+                    Polyline(points = uiState.polylinePoints, color = Color.Blue, width = 15f)
+                }
+
+                uiState.rideRequest?.let { request ->
+                    val pickupLatLng = LatLng(
+                        request.pickupLocation["latitude"] ?: 0.0,
+                        request.pickupLocation["longitude"] ?: 0.0
+                    )
+                    Marker(state = MarkerState(position = pickupLatLng), title = "Jemput")
+
+                    val destLatLng = LatLng(
+                        request.destinationLocation["latitude"] ?: 0.0,
+                        request.destinationLocation["longitude"] ?: 0.0
+                    )
+                    Marker(state = MarkerState(position = destLatLng), title = "Tujuan")
+
+                    request.driverCurrentLocation?.let {
+                        val driverLatLng = LatLng(it["latitude"] ?: 0.0, it["longitude"] ?: 0.0)
+                        Marker(
+                            state = MarkerState(position = driverLatLng),
+                            title = "Driver",
+                            icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
+                        )
+                    }
+                }
             }
 
-            uiState.rideRequest?.let { request ->
-                val pickupLatLng = LatLng(request.pickupLocation["latitude"] ?: 0.0, request.pickupLocation["longitude"] ?: 0.0)
-                Marker(state = MarkerState(position = pickupLatLng), title = "Jemput")
-
-                val destLatLng = LatLng(request.destinationLocation["latitude"] ?: 0.0, request.destinationLocation["longitude"] ?: 0.0)
-                Marker(state = MarkerState(position = destLatLng), title = "Tujuan")
-
-                request.driverCurrentLocation?.let {
-                    val driverLatLng = LatLng(it["latitude"] ?: 0.0, it["longitude"] ?: 0.0)
-                    Marker(
-                        state = MarkerState(position = driverLatLng),
-                        title = "Driver",
-                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
+            Card(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Tampilkan status untuk kedua pengguna
+                    Text(
+                        text = "Status: ${uiState.rideRequest?.status?.replaceFirstChar { it.titlecase() } ?: "Memuat..."}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
                     )
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Tampilkan tombol HANYA untuk driver
+                    if (uiState.isDriver) {
+                        when (uiState.rideRequest?.status) {
+                            "accepted" -> {
+                                Button(
+                                    onClick = { onUpdateStatus("arrived") },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Sudah Sampai di Lokasi Jemput")
+                                }
+                            }
+
+                            "arrived" -> {
+                                Button(
+                                    onClick = { onUpdateStatus("started") },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Mulai Perjalanan")
+                                }
+                            }
+
+                            "started" -> {
+                                Button(
+                                    onClick = { onUpdateStatus("completed") },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Selesaikan Perjalanan")
+                                }
+                            }
+
+                            "completed" -> {
+                                Text("Perjalanan Selesai!")
+                            }
+                        }
+                    }
                 }
             }
         }
-
-        Card(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "Status: ${uiState.rideRequest?.status?.replaceFirstChar { it.titlecase() } ?: "Memuat..."}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
     }
 }
 
-
-@Preview(showBackground = true)
-@Composable
-fun TripScreenPreview() {
+    @Preview(showBackground = true)
+    @Composable
+    fun TripScreenPreview() {
 //    data dummy
-    val fakeRideRequest = RideRequest(
-        status = "accepted",
-        pickupLocation = mapOf("latitude" to -6.892, "longitude" to 109.670),
-        destinationLocation = mapOf("latitude" to -6.902, "longitude" to 109.680),
-        driverCurrentLocation = mapOf("latitude" to -6.895, "longitude" to 109.675)
-    )
-    val fakePolyline = PolyUtil.decode("mp`_F~`|iS_@y@g@s@o@u@") // Contoh polyline pendek
+        val fakeRideRequest = RideRequest(
+            status = "accepted",
+            pickupLocation = mapOf("latitude" to -6.892, "longitude" to 109.670),
+            destinationLocation = mapOf("latitude" to -6.902, "longitude" to 109.680),
+            driverCurrentLocation = mapOf("latitude" to -6.895, "longitude" to 109.675)
+        )
+        val fakePolyline = PolyUtil.decode("mp`_F~`|iS_@y@g@s@o@u@") // Contoh polyline pendek
 
 //    fake state
-    val fakeUiState = TripUiState(
-        rideRequest = fakeRideRequest,
-        polylinePoints = fakePolyline,
-        isDriver = false
-    )
+        val fakeUiState = TripUiState(
+            rideRequest = fakeRideRequest,
+            polylinePoints = fakePolyline,
+            isDriver = false
+        )
 
 //    untuk nampilin ui dengan data dummmy
-    JekSoedTheme {
-        TripScreenContent(uiState = fakeUiState)
+        val cameraState = rememberCameraPositionState()
+        JekSoedTheme {
+            TripScreenContent(
+                uiState = fakeUiState,
+                cameraPositionState = cameraState,
+                onUpdateStatus = {},
+                onLogoutClick = {}
+            )
+        }
     }
-}

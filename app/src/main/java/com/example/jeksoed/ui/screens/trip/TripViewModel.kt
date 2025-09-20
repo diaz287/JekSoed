@@ -37,6 +37,7 @@ class TripViewModel(
 
     private val rideRequestId: String = savedStateHandle.get<String>("rideRequestId")!!
     private val db = FirebaseFirestore.getInstance()
+    private val auth = FirebaseAuth.getInstance()
     private val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
     private var rideRequestListener: ListenerRegistration? = null
     private var locationCallback: LocationCallback? = null
@@ -102,5 +103,22 @@ class TripViewModel(
     override fun onCleared() {
         super.onCleared()
         rideRequestListener?.remove()
+    }
+
+    fun updateTripStatus(newStatus: String) {
+        if (rideRequestId.isNotBlank()) {
+            db.collection("ride_requests").document(rideRequestId)
+                .update("status", newStatus)
+                .addOnSuccessListener {
+                    Log.d("TripViewModel", "Status berhasil diupdate menjadi $newStatus")
+                }
+                .addOnFailureListener { e ->
+                    Log.w("TripViewModel", "Gagal mengupdate status", e)
+                }
+        }
+    }
+
+    fun logout() {
+        auth.signOut()
     }
 }

@@ -1,6 +1,5 @@
 package com.example.jeksoed.ui.screens.driver
 
-import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,126 +12,90 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.jeksoed.data.model.RideRequest
 import com.example.jeksoed.navigation.Screen
 import com.example.jeksoed.ui.theme.JekSoedTheme
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.Query
-
 
 /**
- * SMART COMPOSABLE
- * - Mengelola semua state (isLoading, rideRequests, acceptingRideId).
- * - Menangani semua logika dan side-effect (Listener Firestore, update data, logout, Toast).
+ * SMART COMPOSABLE (SCREEN-LEVEL)
+ * - Membuat ViewModel.
+ * - Mengumpulkan state dari ViewModel.
+ * - Menangani navigasi.
+ * - Meneruskan state dan event handler ke UI "bodoh".
  */
 @Composable
 fun DriverHomeScreen(
     navController: NavController,
-    auth: FirebaseAuth = FirebaseAuth.getInstance(),
-    firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
+    viewModel: DriverHomeViewModel = viewModel()
 ) {
+    val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    var rideRequests by remember { mutableStateOf<List<RideRequest>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-    var acceptingRideId by remember { mutableStateOf<String?>(null) } // State untuk tahu orderan mana yg sedang di-accept
-
-    // Listener untuk mengambil daftar orderan "pending" secara real-time
-    DisposableEffect(Unit) {
-        val listener = firestore.collection("ride_requests")
-            .whereEqualTo("status", "pending")
-            .orderBy("createdAt", Query.Direction.DESCENDING)
-            .addSnapshotListener { snapshot, e ->
-                isLoading = false
-                if (e != null) {
-                    Log.w("DriverHome", "Listen failed.", e)
-                    return@addSnapshotListener
-                }
-                if (snapshot != null) {
-                    rideRequests = snapshot.documents.mapNotNull { doc ->
-                        doc.toObject(RideRequest::class.java)?.copy(id = doc.id)
-                    }
-                }
-            }
-        onDispose { listener.remove() }
-    }
 
     DriverHomeScreenUI(
-        rideRequests = rideRequests,
-        isLoading = isLoading,
-        acceptingRideId = acceptingRideId,
+        uiState = uiState,
         onAcceptRide = { rideId ->
-            acceptingRideId = rideId
-            val driverId = auth.currentUser?.uid
-            firestore.collection("ride_requests").document(rideId)
-                .update(mapOf("status" to "accepted", "driverId" to driverId))
-                .addOnSuccessListener {
-                    acceptingRideId = null
+            viewModel.acceptRide(
+                rideId = rideId,
+                onSuccess = {
                     Toast.makeText(context, "Orderan berhasil diambil!", Toast.LENGTH_SHORT).show()
-                }
-                .addOnFailureListener { e ->
-                    acceptingRideId = null
+                    navController.navigate(Screen.Trip.createRoute(rideId))
+                },
+                onFailure = { e ->
                     Toast.makeText(context, "Gagal mengambil orderan: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
+            )
         },
         onLogoutClick = {
-            auth.signOut()
+            viewModel.logout()
             navController.navigate(Screen.Login.route) {
                 popUpTo(Screen.DriverHome.route) { inclusive = true }
             }
-        },
-        navController = navController
+        }
     )
 }
 
 /**
  * DUMB UI COMPOSABLE
- * - Hanya menampilkan data yang diberikan.
- * - Meneruskan semua aksi pengguna ke atas melalui lambda.
+ * - Sepenuhnya dikontrol dari luar.
+ * - Tidak memiliki state internal atau logika bisnis.
  * - Mudah di-preview.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DriverHomeScreenUI(
-    rideRequests: List<RideRequest>,
-    isLoading: Boolean,
-    acceptingRideId: String?,
+    uiState: DriverHomeUiState,
     onAcceptRide: (rideId: String) -> Unit,
-    onLogoutClick: () -> Unit,
-    navController: NavController
+    onLogoutClick: () -> Unit
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Orderan Tersedia") },
-                actions = {
-                    Button(onClick = onLogoutClick) {
-                        Text("Logout")
-                    }
-                }
+                actions = { Button(onClick = onLogoutClick) { Text("Logout") } }
             )
         }
     ) { paddingValues ->
-        Box(modifier = Modifier
-            .fillMaxSize()
-            .padding(paddingValues)) {
-            if (isLoading) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            } else if (rideRequests.isEmpty()) {
-                Text("Belum ada orderan tersedia.", modifier = Modifier.align(Alignment.Center))
+        Box(
+            modifier = Modifier.fillMaxSize().padding(paddingValues),
+            contentAlignment = Alignment.Center
+        ) {
+            if (uiState.isLoading) {
+                CircularProgressIndicator()
+            } else if (uiState.rideRequests.isEmpty()) {
+                Text("Belum ada orderan tersedia.")
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(rideRequests) { request ->
+                    items(uiState.rideRequests) { request ->
                         RideRequestCard(
                             rideRequest = request,
-                            isAccepting = (acceptingRideId == request.id),
-                            onAcceptClick = { onAcceptRide(request.id) },
-                            navController = navController
+                            isAccepting = (uiState.acceptingRideId == request.id),
+                            onAcceptClick = { onAcceptRide(request.id) }
                         )
                     }
                 }
@@ -144,14 +107,12 @@ fun DriverHomeScreenUI(
 /**
  * DUMB COMPONENT CARD
  * - Hanya menampilkan data satu orderan.
- * - Tidak punya logika internal.
  */
 @Composable
 fun RideRequestCard(
     rideRequest: RideRequest,
     isAccepting: Boolean,
-    onAcceptClick: () -> Unit,
-    navController: NavController
+    onAcceptClick: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -183,7 +144,6 @@ fun RideRequestCard(
     }
 }
 
-
 @Preview(showBackground = true)
 @Composable
 private fun DriverHomeScreenPreview() {
@@ -191,14 +151,16 @@ private fun DriverHomeScreenPreview() {
         RideRequest(id = "1", distance = "5.2 km", duration = "15 min"),
         RideRequest(id = "2", distance = "3.1 km", duration = "8 min"),
     )
+    val dummyUiState = DriverHomeUiState(
+        rideRequests = dummyRequests,
+        isLoading = false,
+        acceptingRideId = "2" // Contoh jika orderan kedua sedang di-accept
+    )
     JekSoedTheme {
         DriverHomeScreenUI(
-            rideRequests = dummyRequests,
-            isLoading = false,
-            acceptingRideId = "2", // Contoh jika orderan kedua sedang di-accept
+            uiState = dummyUiState,
             onAcceptRide = {},
-            onLogoutClick = {},
-            navController = NavController(LocalContext.current)
+            onLogoutClick = {}
         )
     }
 }
