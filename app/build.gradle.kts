@@ -91,4 +91,5 @@ dependencies {
     implementation("com.google.maps:google-maps-services:2.2.0")
     implementation("org.slf4j:slf4j-simple:1.7.36")
     implementation("com.google.maps.android:android-maps-utils:3.8.0")
+    implementation("androidx.compose.material:material-icons-extended:1.7.0")
 }

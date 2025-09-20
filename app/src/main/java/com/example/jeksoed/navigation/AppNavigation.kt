@@ -1,15 +1,18 @@
 package com.example.jeksoed.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.jeksoed.ui.screens.splash.SplashScreen
 import com.example.jeksoed.ui.screens.auth.LoginScreen
 import com.example.jeksoed.ui.screens.auth.RegisterScreen
 import com.example.jeksoed.ui.screens.passenger.PassengerHomeScreen
 import com.example.jeksoed.ui.screens.driver.DriverHomeScreen
 import com.example.jeksoed.ui.screens.passenger.FindingDriverScreen
+import com.example.jeksoed.ui.screens.rating.RatingScreen
 import com.example.jeksoed.ui.screens.trip.TripScreen
 
 sealed class Screen(val route: String) {
@@ -23,6 +26,9 @@ sealed class Screen(val route: String) {
     }
     object Trip : Screen("trip/{rideRequestId}") {
         fun createRoute(rideRequestId: String) = "trip/$rideRequestId"
+    }
+    object Rating : Screen("rating/{driverId}") {
+        fun createRoute(driverId: String) = "rating/$driverId"
     }
 }
 
@@ -49,5 +55,15 @@ fun AppNavigation() {
         composable(Screen.Trip.route) {
             TripScreen(navController = navController)
         }
+        composable(
+            route = Screen.Rating.route,
+            arguments = listOf(
+                navArgument("driverId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val driverId = backStackEntry.arguments?.getString("driverId")!!
+            RatingScreen(navController = navController, driverId = driverId)
+        }
+
     }
 }

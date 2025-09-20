@@ -28,7 +28,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 
 sealed class TripNavEvent {
     object NavigateToDriverHome : TripNavEvent()
-    object NavigateToPassengerHome : TripNavEvent()
+    data class NavigateToRatingScreen(val driverId: String) : TripNavEvent()
 }
 
 // Data class untuk menampung semua state UI dalam satu objek
@@ -70,21 +70,26 @@ class TripViewModel(
                 }
                 if (snapshot != null && snapshot.exists()) {
                     val request = snapshot.toObject(RideRequest::class.java)?.copy(id = snapshot.id)
-                    if (request?.status == "completed") {
-                        viewModelScope.launch {
-                            if (_uiState.value.isDriver) {
-                                _navEvent.emit(TripNavEvent.NavigateToDriverHome)
-                            } else {
-                                _navEvent.emit(TripNavEvent.NavigateToPassengerHome)
-                            }
-                        }
-                    }
+
                     _uiState.update { currentState ->
                         currentState.copy(
                             rideRequest = request,
                             isDriver = request?.driverId == currentUserId,
                             polylinePoints = request?.encodedPolyline?.let { PolyUtil.decode(it) } ?: emptyList()
                         )
+                    }
+
+                    if (request?.status == "completed") {
+                        viewModelScope.launch {
+                            if (_uiState.value.isDriver) {
+                                _navEvent.emit(TripNavEvent.NavigateToDriverHome)
+                            } else {
+                                val driverId = request?.driverId
+                                if (driverId != null) {
+                                    _navEvent.emit(TripNavEvent.NavigateToRatingScreen(driverId))
+                                }
+                            }
+                        }
                     }
                 }
             }

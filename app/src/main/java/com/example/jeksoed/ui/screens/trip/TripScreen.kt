@@ -1,8 +1,7 @@
-// File: ui/trip/TripScreen.kt
-
 package com.example.jeksoed.ui.screens.trip
 
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -11,12 +10,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.jeksoed.data.model.RideRequest
 import com.example.jeksoed.navigation.Screen
+import com.example.jeksoed.ui.screens.rating.RatingNavEvent
 import com.example.jeksoed.ui.theme.JekSoedTheme
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
@@ -55,9 +56,8 @@ fun TripScreen(
                         popUpTo(navController.graph.startDestinationId) { inclusive = true }
                     }
                 }
-                is TripNavEvent.NavigateToPassengerHome -> {
-                    navController.navigate(Screen.PassengerHome.route) {
-                        // Hapus semua histori navigasi
+                is TripNavEvent.NavigateToRatingScreen -> {
+                    navController.navigate(Screen.Rating.createRoute(event.driverId)) {
                         popUpTo(navController.graph.startDestinationId) { inclusive = true }
                     }
                 }
@@ -74,7 +74,7 @@ fun TripScreen(
         onLogoutClick = {
             viewModel.logout()
             navController.navigate(Screen.Login.route) {
-                popUpTo(Screen.Trip.route) { inclusive = true }
+                popUpTo(navController.graph.startDestinationId) { inclusive = true }
             }
         }
     )
@@ -103,8 +103,18 @@ fun TripScreenContent(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Trip") },
-                actions = { Button(onClick = onLogoutClick) { Text("Logout") } }
+                title = {
+                    Text(
+                        "Perjalanan Berlangsung",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
+                actions = {
+                    TextButton(onClick = onLogoutClick) {
+                        Text("Logout")
+                    }
+                }
             )
         }
     ) { paddingValues ->
