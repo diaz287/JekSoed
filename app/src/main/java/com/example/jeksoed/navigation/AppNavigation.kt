@@ -46,11 +46,8 @@ fun AppNavigation() {
                 }
             }
         }
-        composable(Screen.Trip.route) { backStackEntry ->
-            val rideRequestId = backStackEntry.arguments?.getString("rideRequestId")
-            if (rideRequestId != null) {
-                TripScreen(navController = navController, rideRequestId = rideRequestId)
-            }
+        composable(Screen.Trip.route) {
+            TripScreen(navController = navController)
         }
     }
 }

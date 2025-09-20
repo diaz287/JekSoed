@@ -9,61 +9,57 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.jeksoed.data.model.RideRequest
+import com.example.jeksoed.ui.theme.JekSoedTheme
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
-import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.Timestamp
 import com.google.maps.android.PolyUtil
 import com.google.maps.android.compose.*
 
+// Composable yang terhubung ke ViewModel
 @Composable
-fun TripScreen(navController: NavController, rideRequestId: String) {
-    var rideRequest by remember { mutableStateOf<RideRequest?>(null) }
-    var routePolyline by remember { mutableStateOf<List<LatLng>>(emptyList()) }
-    val cameraPositionState = rememberCameraPositionState()
+fun TripScreen(
+    navController: NavController,
+    viewModel: TripViewModel = viewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
 
-    DisposableEffect(rideRequestId) {
-        val db = FirebaseFirestore.getInstance()
-        val docRef = db.collection("ride_requests").document(rideRequestId)
-
-        val listener = docRef.addSnapshotListener { snapshot, e ->
-            if (e != null) {
-                Log.w("TripScreen", "Listen failed.", e)
-                return@addSnapshotListener
-            }
-            if (snapshot != null && snapshot.exists()) {
-                // Konversi ke data class, ini lebih aman
-                val request = snapshot.toObject(RideRequest::class.java)?.copy(id = snapshot.id)
-                rideRequest = request
-
-                // Log untuk debugging
-                Log.d("TripScreen", "Data Diterima: $request")
-
-                // Proses polyline HANYA jika datanya ada
-                if (request?.encodedPolyline != null) {
-                    routePolyline = PolyUtil.decode(request.encodedPolyline)
-                    Log.d("TripScreen", "Polyline berhasil di-decode, jumlah titik: ${routePolyline.size}")
-                } else {
-                    Log.w("TripScreen", "encodedPolyline tidak ditemukan di dokumen!")
-                }
+    // Logic khusus untuk Driver (start/stop location updates)
+    if (uiState.isDriver) {
+        val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+        DisposableEffect(Unit) {
+            viewModel.startLocationUpdates(fusedLocationClient, context)
+            onDispose {
+                viewModel.stopLocationUpdates(fusedLocationClient)
             }
         }
-
-        onDispose { listener.remove() }
     }
 
-    // Efek ini akan berjalan HANYA jika routePolyline sudah terisi
-    LaunchedEffect(routePolyline) {
-        if (routePolyline.isNotEmpty()) {
+    TripScreenContent(uiState = uiState)
+}
+
+// Composable yang hanya bertugas menampilkan UI
+@Composable
+fun TripScreenContent(uiState: TripUiState) {
+    val cameraPositionState = rememberCameraPositionState()
+
+    // Efek untuk menyesuaikan kamera
+    LaunchedEffect(uiState.polylinePoints) {
+        if (uiState.polylinePoints.isNotEmpty()) {
             val bounds = LatLngBounds.builder()
-            routePolyline.forEach { point ->
-                bounds.include(point)
-            }
+            uiState.polylinePoints.forEach { bounds.include(it) }
             cameraPositionState.animate(
-                com.google.android.gms.maps.CameraUpdateFactory.newLatLngBounds(bounds.build(), 150) // 150px padding
+                com.google.android.gms.maps.CameraUpdateFactory.newLatLngBounds(bounds.build(), 150)
             )
         }
     }
@@ -73,18 +69,25 @@ fun TripScreen(navController: NavController, rideRequestId: String) {
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState
         ) {
-            // Gambar rute JIKA routePolyline tidak kosong
-            if (routePolyline.isNotEmpty()) {
-                Polyline(points = routePolyline, color = Color.Blue, width = 15f)
+            if (uiState.polylinePoints.isNotEmpty()) {
+                Polyline(points = uiState.polylinePoints, color = Color.Blue, width = 15f)
             }
 
-            // Tampilkan marker berdasarkan rideRequest
-            rideRequest?.let { request ->
+            uiState.rideRequest?.let { request ->
                 val pickupLatLng = LatLng(request.pickupLocation["latitude"] ?: 0.0, request.pickupLocation["longitude"] ?: 0.0)
-                Marker(state = MarkerState(position = pickupLatLng), title = "Jemput di sini")
+                Marker(state = MarkerState(position = pickupLatLng), title = "Jemput")
 
-                val destinationLatLng = LatLng(request.destinationLocation["latitude"] ?: 0.0, request.destinationLocation["longitude"] ?: 0.0)
-                Marker(state = MarkerState(position = destinationLatLng), title = "Tujuan")
+                val destLatLng = LatLng(request.destinationLocation["latitude"] ?: 0.0, request.destinationLocation["longitude"] ?: 0.0)
+                Marker(state = MarkerState(position = destLatLng), title = "Tujuan")
+
+                request.driverCurrentLocation?.let {
+                    val driverLatLng = LatLng(it["latitude"] ?: 0.0, it["longitude"] ?: 0.0)
+                    Marker(
+                        state = MarkerState(position = driverLatLng),
+                        title = "Driver",
+                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
+                    )
+                }
             }
         }
 
@@ -96,12 +99,37 @@ fun TripScreen(navController: NavController, rideRequestId: String) {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "Status: ${rideRequest?.status?.replaceFirstChar { it.titlecase() } ?: "Memuat..."}",
+                    text = "Status: ${uiState.rideRequest?.status?.replaceFirstChar { it.titlecase() } ?: "Memuat..."}",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
-                // Di sini kita bisa menambahkan info driver, tombol, dll.
             }
         }
+    }
+}
+
+
+@Preview(showBackground = true)
+@Composable
+fun TripScreenPreview() {
+//    data dummy
+    val fakeRideRequest = RideRequest(
+        status = "accepted",
+        pickupLocation = mapOf("latitude" to -6.892, "longitude" to 109.670),
+        destinationLocation = mapOf("latitude" to -6.902, "longitude" to 109.680),
+        driverCurrentLocation = mapOf("latitude" to -6.895, "longitude" to 109.675)
+    )
+    val fakePolyline = PolyUtil.decode("mp`_F~`|iS_@y@g@s@o@u@") // Contoh polyline pendek
+
+//    fake state
+    val fakeUiState = TripUiState(
+        rideRequest = fakeRideRequest,
+        polylinePoints = fakePolyline,
+        isDriver = false
+    )
+
+//    untuk nampilin ui dengan data dummmy
+    JekSoedTheme {
+        TripScreenContent(uiState = fakeUiState)
     }
 }
