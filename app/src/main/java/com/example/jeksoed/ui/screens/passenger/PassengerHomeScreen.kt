@@ -93,6 +93,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.jeksoed.ui.theme.JekSoedTheme
+import com.example.jeksoed.utils.calculatePrice
+import com.example.jeksoed.utils.formatCurrency
 
 /**
  * =================================================================================
@@ -184,11 +186,15 @@ fun PassengerHomeScreen(
                         val route = directionsResult.routes[0]
                         val leg = route.legs[0]
                         val points = PolyUtil.decode(route.overviewPolyline.encodedPath)
+                        val priceValue = calculatePrice(leg.distance.inMeters)
+                        val formattedPrice = formatCurrency(priceValue)
+
                         routeInfo = RouteInfo(
                             distance = leg.distance.humanReadable,
                             duration = leg.duration.humanReadable,
                             polylinePoints = points,
-                            encodedPath = route.overviewPolyline.encodedPath
+                            encodedPath = route.overviewPolyline.encodedPath,
+                            price = formattedPrice
                         )
                     } else {
                         Toast.makeText(context, "Tidak dapat menemukan rute.", Toast.LENGTH_SHORT).show()
@@ -462,6 +468,10 @@ private fun RouteInfoCard(
                     Text("Jarak Tempuh", style = MaterialTheme.typography.bodySmall)
                     Text(routeInfo.distance, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Harga", style = MaterialTheme.typography.bodySmall)
+                    Text(routeInfo?.price ?: "-", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                }
             }
             Spacer(modifier = Modifier.height(16.dp))
             Button(
@@ -489,7 +499,7 @@ private data class DummyPrediction(
 // Data palsu untuk digunakan di berbagai preview
 private val DUMMY_USER_LOCATION = LatLng(-7.431, 109.245) // Purwokerto
 private val DUMMY_DESTINATION_LOCATION = LatLng(-7.420, 109.255)
-private val DUMMY_ROUTE_INFO = RouteInfo(distance = "5.2 km", duration = "15 min", polylinePoints = emptyList(), encodedPath = "dummy_encoded_path_string")
+private val DUMMY_ROUTE_INFO = RouteInfo(distance = "5.2 km", duration = "15 min", polylinePoints = emptyList(), encodedPath = "dummy_encoded_path_string", price = "Rp 11.000")
 private val DUMMY_PREDICTIONS = listOf(
     DummyPrediction("Alun-Alun Purwokerto", "Jl. Jend. Soedirman, Purwokerto"),
     DummyPrediction("Stasiun Purwokerto", "Jl. Stasiun, Kober, Purwokerto Barat"),

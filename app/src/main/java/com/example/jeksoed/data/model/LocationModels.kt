@@ -17,5 +17,6 @@ data class RouteInfo(
     val distance: String,
     val duration: String,
     val polylinePoints: List<LatLng>,
-    val encodedPath: String
+    val encodedPath: String,
+    val price: String
 )

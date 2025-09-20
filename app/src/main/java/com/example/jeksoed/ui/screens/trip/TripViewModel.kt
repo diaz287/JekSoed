@@ -23,6 +23,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+
+sealed class TripNavEvent {
+    object NavigateToDriverHome : TripNavEvent()
+    object NavigateToPassengerHome : TripNavEvent()
+}
 
 // Data class untuk menampung semua state UI dalam satu objek
 data class TripUiState(
@@ -45,6 +52,8 @@ class TripViewModel(
     // State yang akan diobservasi oleh UI
     private val _uiState = MutableStateFlow(TripUiState())
     val uiState = _uiState.asStateFlow()
+    private val _navEvent = MutableSharedFlow<TripNavEvent>()
+    val navEvent = _navEvent.asSharedFlow()
 
     init {
         if (rideRequestId.isNotBlank()) {
@@ -61,6 +70,15 @@ class TripViewModel(
                 }
                 if (snapshot != null && snapshot.exists()) {
                     val request = snapshot.toObject(RideRequest::class.java)?.copy(id = snapshot.id)
+                    if (request?.status == "completed") {
+                        viewModelScope.launch {
+                            if (_uiState.value.isDriver) {
+                                _navEvent.emit(TripNavEvent.NavigateToDriverHome)
+                            } else {
+                                _navEvent.emit(TripNavEvent.NavigateToPassengerHome)
+                            }
+                        }
+                    }
                     _uiState.update { currentState ->
                         currentState.copy(
                             rideRequest = request,

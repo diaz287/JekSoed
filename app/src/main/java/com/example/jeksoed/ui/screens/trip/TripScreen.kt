@@ -46,6 +46,25 @@ fun TripScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        viewModel.navEvent.collect { event ->
+            when (event) {
+                is TripNavEvent.NavigateToDriverHome -> {
+                    navController.navigate(Screen.DriverHome.route) {
+                        // Hapus semua histori navigasi agar driver tidak bisa kembali ke TripScreen
+                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                    }
+                }
+                is TripNavEvent.NavigateToPassengerHome -> {
+                    navController.navigate(Screen.PassengerHome.route) {
+                        // Hapus semua histori navigasi
+                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                    }
+                }
+            }
+        }
+    }
+
     TripScreenContent(
         uiState = uiState,
         cameraPositionState = rememberCameraPositionState(),
