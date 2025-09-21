@@ -22,11 +22,11 @@ import androidx.navigation.NavController
 import com.example.jeksoed.navigation.Screen
 import com.example.jeksoed.ui.theme.JekSoedTheme
 
-// Composable "Pintar" (Controller)
 @Composable
 fun RatingScreen(
     navController: NavController,
     viewModel: RatingViewModel = viewModel(),
+    driverId: String,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current

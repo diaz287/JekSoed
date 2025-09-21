@@ -14,6 +14,7 @@ import com.example.jeksoed.ui.screens.driver.DriverHomeScreen
 import com.example.jeksoed.ui.screens.passenger.FindingDriverScreen
 import com.example.jeksoed.ui.screens.rating.RatingScreen
 import com.example.jeksoed.ui.screens.trip.TripScreen
+import com.example.jeksoed.ui.screens.chat.ChatScreen
 
 sealed class Screen(val route: String) {
     object Splash : Screen("splash")
@@ -29,6 +30,9 @@ sealed class Screen(val route: String) {
     }
     object Rating : Screen("rating/{driverId}") {
         fun createRoute(driverId: String) = "rating/$driverId"
+    }
+    object Chat : Screen("chat/{rideRequestId}") {
+        fun createRoute(rideRequestId: String) = "chat/$rideRequestId"
     }
 }
 
@@ -63,6 +67,12 @@ fun AppNavigation() {
         ) { backStackEntry ->
             val driverId = backStackEntry.arguments?.getString("driverId")!!
             RatingScreen(navController = navController, driverId = driverId)
+        }
+        composable(Screen.Chat.route) { backStackEntry ->
+            val rideRequestId = backStackEntry.arguments?.getString("rideRequestId")
+            if (rideRequestId != null) {
+                ChatScreen(navController = navController,rideRequestId = rideRequestId)
+            }
         }
 
     }

@@ -15,6 +15,7 @@ import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.maps.model.LatLng
+import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -130,8 +131,13 @@ class TripViewModel(
 
     fun updateTripStatus(newStatus: String) {
         if (rideRequestId.isNotBlank()) {
+            val updateData = mutableMapOf<String, Any>("status" to newStatus)
+            if (newStatus == "completed") {
+                updateData["completedAt"] = Timestamp.now()
+            }
+
             db.collection("ride_requests").document(rideRequestId)
-                .update("status", newStatus)
+                .update(updateData)
                 .addOnSuccessListener {
                     Log.d("TripViewModel", "Status berhasil diupdate menjadi $newStatus")
                 }

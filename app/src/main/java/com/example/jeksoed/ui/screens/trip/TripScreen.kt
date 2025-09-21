@@ -3,6 +3,8 @@ package com.example.jeksoed.ui.screens.trip
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -71,6 +73,9 @@ fun TripScreen(
         onUpdateStatus = { newStatus ->
             viewModel.updateTripStatus(newStatus)
         },
+        onChatClick = { rideId ->
+            navController.navigate(Screen.Chat.createRoute(rideId))
+        },
         onLogoutClick = {
             viewModel.logout()
             navController.navigate(Screen.Login.route) {
@@ -87,6 +92,7 @@ fun TripScreenContent(
     uiState: TripUiState,
     cameraPositionState: CameraPositionState,
     onUpdateStatus: (String) -> Unit,
+    onChatClick: (rideId: String) -> Unit,
     onLogoutClick: () -> Unit
 ) {
 
@@ -111,7 +117,14 @@ fun TripScreenContent(
                     )
                 },
                 actions = {
-                    TextButton(onClick = onLogoutClick) {
+                    IconButton(onClick = {
+                        uiState.rideRequest?.id?.let { rideId ->
+                            onChatClick(rideId)
+                        }
+                    }) {
+                        Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Chat")
+                    }
+                    Button(onClick = onLogoutClick) {
                         Text("Logout")
                     }
                 }
@@ -237,6 +250,7 @@ fun TripScreenContent(
                 uiState = fakeUiState,
                 cameraPositionState = cameraState,
                 onUpdateStatus = {},
+                onChatClick = {},
                 onLogoutClick = {}
             )
         }
