@@ -48,6 +48,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -145,15 +146,19 @@ fun PassengerHomeScreen(
         }
     }
 
-    LaunchedEffect(searchQuery) {
-        if (searchQuery.length > 2) {
+    val currentQuery by rememberUpdatedState(searchQuery)
+
+    LaunchedEffect(currentQuery) {
+        if (currentQuery.length > 2) {
             isSearching = true
-            delay(300L)
+            delay(300L) // debounce
+
             try {
                 val request = FindAutocompletePredictionsRequest.builder()
-                    .setQuery(searchQuery)
+                    .setQuery(currentQuery)
                     .setCountries("ID")
                     .build()
+
                 val response = placesClient.findAutocompletePredictions(request).await()
                 predictions = response.autocompletePredictions
             } catch (e: Exception) {
@@ -165,6 +170,7 @@ fun PassengerHomeScreen(
             predictions = emptyList()
         }
     }
+
 
     LaunchedEffect(destinationLocation) {
         if (userLocation != null && destinationLocation != null) {

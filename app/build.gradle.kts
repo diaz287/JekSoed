@@ -51,8 +51,8 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     val composeBom = platform("androidx.compose:compose-bom:2025.08.00")
     implementation(composeBom)
-    implementation("com.google.android.material:material:1.13.0")
     androidTestImplementation(composeBom)
+    implementation("com.google.android.material:material:1.13.0")
     // Material Design 3
     implementation("androidx.compose.material3:material3")
     // Android Studio Preview support
@@ -69,7 +69,7 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
-//    implementation(platform("com.google.firebase:firebase-bom:34.2.0"))
+//    implementation(platform("com.google.firebase:firebase-bom:34.3.0"))
     implementation("com.google.firebase:firebase-auth-ktx:23.2.1")
     implementation("com.google.firebase:firebase-firestore-ktx:25.1.4")
     implementation("com.google.firebase:firebase-analytics-ktx:22.5.0")
@@ -92,4 +92,5 @@ dependencies {
     implementation("org.slf4j:slf4j-simple:1.7.36")
     implementation("com.google.maps.android:android-maps-utils:3.8.0")
     implementation("androidx.compose.material:material-icons-extended:1.7.0")
+    implementation("com.google.firebase:firebase-messaging-ktx:24.0.1")
 }

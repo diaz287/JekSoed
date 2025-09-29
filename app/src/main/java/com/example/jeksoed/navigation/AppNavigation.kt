@@ -74,6 +74,5 @@ fun AppNavigation() {
                 ChatScreen(navController = navController,rideRequestId = rideRequestId)
             }
         }
-
     }
 }
