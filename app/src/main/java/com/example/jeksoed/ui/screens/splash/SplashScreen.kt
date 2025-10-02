@@ -1,5 +1,6 @@
 package com.example.jeksoed.ui.screens.splash
 
+import android.util.Log
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
@@ -10,19 +11,31 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavController
 import com.example.jeksoed.navigation.Screen
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import com.google.firebase.messaging.FirebaseMessaging
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.tasks.await
 
 @Composable
 fun SplashScreen(navController: NavController) {
     val auth = FirebaseAuth.getInstance()
     LaunchedEffect(key1 = true) {
+        delay(2000)
         if (auth.currentUser == null) {
             // Jika tidak ada user yang login, langsung ke halaman Login
             navController.navigate(Screen.Login.route) {
                 popUpTo(Screen.Splash.route) { inclusive = true }
             }
         } else {
+            try {
+                val token = FirebaseMessaging.getInstance().token.await()
+                FirebaseFirestore.getInstance().collection("users").document(auth.currentUser!!.uid)
+                    .update("fcmToken", token)
+            } catch (e: Exception) {
+                Log.w("SplashScreen", "Gagal mendapatkan FCM token", e)
+            }
             // Jika ada user yang login, cek perannya di Firestore
             val uid = auth.currentUser!!.uid
             Firebase.firestore.collection("users").document(uid).get()
