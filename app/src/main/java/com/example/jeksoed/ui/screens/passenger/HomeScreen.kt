@@ -19,12 +19,18 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -34,125 +40,145 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.jeksoed.R // Pastikan import R ini benar
+import com.example.jeksoed.ui.screens.passenger.components.BannerSlider
+import com.example.jeksoed.ui.screens.passenger.components.CategoryGrid
+import com.example.jeksoed.ui.screens.passenger.components.RecentHistoryList
+import com.example.jeksoed.ui.screens.passenger.components.RecommendationSection
+import com.example.jeksoed.ui.screens.passenger.components.TopHeader
 import com.example.jeksoed.ui.theme.JekSoedTheme
 import kotlinx.coroutines.delay
 
 // --- Data class untuk mock data (data palsu) ---
 data class Category(val name: String, val iconResId: Int, val tag: String? = null)
 data class HistoryItem(val title: String, val address: String)
-
 @Composable
 fun HomeScreen(
     onSearchClick: () -> Unit
 ) {
-    // State untuk mengelola dialog "dalam pengembangan"
     var showDialog by remember { mutableStateOf(false) }
-
-    // State untuk status notifikasi (true = ada notif, false = tidak ada)
     val hasNotification by remember { mutableStateOf(true) }
-
-    // State untuk nama user (dalam aplikasi nyata, ini datang dari ViewModel/login state)
     val userName = "Rafi Purnama"
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(
+    // --- PENGATURAN UNTUK SCROLLING EFFECT ---
+    val bannerHeight = 240.dp // Tinggi banner yang terlihat di awal
+    val topHeaderHeight = 100.dp // Perkiraan tinggi TopHeader + paddingnya
+
+    // Konversi Dp ke Px untuk perhitungan
+    val bannerHeightPx = with(LocalDensity.current) { bannerHeight.toPx() }
+    val topHeaderHeightPx = with(LocalDensity.current) { topHeaderHeight.toPx() }
+
+    // State untuk melacak seberapa jauh header telah "terlipat" (collapsed)
+    // Nilainya akan bergerak dari 0 (terbuka penuh) hingga maxOffsetPx (terlipat penuh)
+    val collapsedOffsetPx = remember { mutableStateOf(0f) }
+    val maxOffsetPx = bannerHeightPx - topHeaderHeightPx
+
+    // Objek yang akan menangani logika "mencuri" scroll
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                val delta = available.y
+                val newOffset = collapsedOffsetPx.value + delta
+                // Batasi pergerakan offset antara 0 dan nilai maksimumnya
+                collapsedOffsetPx.value = newOffset.coerceIn(0f, maxOffsetPx)
+
+                // Kembalikan seberapa banyak scroll yang kita "curi"
+                return Offset.Zero
+            }
+        }
+    }
+
+    // --- STRUKTUR LAYOUT BARU ---
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            // Terapkan nested scroll di container utama
+            .nestedScroll(nestedScrollConnection)
+    ) {
+        // 1. BANNER (di lapisan paling bawah)
+        // Offset vertikalnya dikontrol oleh state scroll
+        BannerSlider(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(300.dp) // Tinggi asli banner tetap
+                .graphicsLayer {
+                    // Efek parallax: banner bergerak lebih lambat dari scroll
+                    translationY = -collapsedOffsetPx.value * 0.5f
+                }
+        )
+
+        // 2. KONTEN UTAMA (LazyColumn di dalam Surface)
+        // Surface ini adalah "Card" putih yang akan bergerak
+        Surface(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                .graphicsLayer {
+                    // Pergerakan utama dari card putih
+                    translationY = bannerHeightPx - collapsedOffsetPx.value
+                },
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            color = MaterialTheme.colorScheme.surface
         ) {
-            // Bagian 1: Header Atas (Sapaan & Notifikasi)
-            TopHeader(
-                name = userName,
-                hasNotification = hasNotification,
-                onNotificationClick = { /* TODO: Logika klik notifikasi */ }
-            )
-
-            // Bagian 2: Konten Utama dengan Latar Belakang Putih
-            Card(
-                modifier = Modifier
-                    .fillMaxSize(),
-                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            LazyColumn(
+                contentPadding = PaddingValues(top = 16.dp) // Padding atas untuk konten
             ) {
-                // Gunakan LazyColumn agar bisa di-scroll jika kontennya panjang
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp)
-                ) {
-                    // Item untuk Search Bar
-                    item {
+                // SearchBar
+                item {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                         SearchBarFake(onSearchClick)
                         Spacer(modifier = Modifier.height(24.dp))
                     }
-
-                    // Item untuk Kategori
-                    item {
+                }
+                // Kategori
+                item {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                         Text("Kategori", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(40.dp))
                         CategoryGrid(onCategoryClick = { categoryName ->
                             if (categoryName == "JekClean" || categoryName == "Lainnya") {
                                 showDialog = true
-                            } else {
-                                // TODO: Navigasi untuk JekMotor & JekMobil
                             }
                         })
                         Spacer(modifier = Modifier.height(24.dp))
                     }
-
-                    // Item untuk "Baru baru ini"
-                    item {
+                }
+                // Baru baru ini
+                item {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                         Text("Baru baru ini...", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(12.dp))
                         RecentHistoryList()
                     }
                 }
+                // Rekomendasi
+                item {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    RecommendationSection()
+                }
             }
+        }
+
+        // 3. TOP HEADER (di lapisan paling atas)
+        // Background-nya akan berubah dari transparan menjadi putih
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surface.copy(
+                // Alpha (transparansi) dihitung berdasarkan progres scroll
+                alpha = (collapsedOffsetPx.value / maxOffsetPx).coerceIn(0f, 1f)
+            ),
+            shadowElevation = 4.dp // Beri sedikit bayangan saat background putih muncul
+        ) {
+            TopHeader(
+                name = userName,
+                hasNotification = hasNotification,
+                onNotificationClick = { /* TODO: Logika klik notifikasi */ }
+            )
         }
     }
 
-    // Tampilkan dialog jika showDialog bernilai true
     if (showDialog) {
         DevelopmentDialog(onDismiss = { showDialog = false })
     }
 }
-
-@Composable
-fun TopHeader(name: String, hasNotification: Boolean, onNotificationClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 32.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = "Halo, $name!",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
-        )
-        IconButton(onClick = onNotificationClick) {
-            Box {
-                Icon(
-                    imageVector = if (hasNotification) Icons.Outlined.Notifications else Icons.Outlined.Notifications,
-                    contentDescription = "Notifikasi",
-                    modifier = Modifier.size(28.dp)
-                )
-                if (hasNotification) {
-                    // Titik merah notifikasi
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(colorResource(R.color.unsoed))
-                            .align(Alignment.TopEnd)
-                    )
-                }
-            }
-        }
-    }
-}
-
-
 @Composable
 fun SearchBarFake(onSearchClick: () -> Unit) {
     Card(
@@ -183,105 +209,6 @@ fun SearchBarFake(onSearchClick: () -> Unit) {
             )
 
         }
-    }
-}
-
-@Composable
-fun CategoryGrid(onCategoryClick: (String) -> Unit) {
-    // Mock data untuk kategori
-    val categories = listOf(
-        Category("JekMotor", R.drawable.motor_icon, "START 7K"),
-        Category("JekMobil", R.drawable.car_icon, "START 13K"),
-        Category("JekClean", R.drawable.cleaning_icon, "-10%"),
-        Category(name = "Lainnya", iconResId = R.drawable.more_icon)
-    )
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceAround,
-        verticalAlignment = Alignment.Top
-    ) {
-        categories.forEach { category ->
-            CategoryItem(category = category, onClick = { onCategoryClick(category.name) })
-        }
-    }
-}
-
-@Composable
-fun CategoryItem(category: Category, onClick: () -> Unit) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable { onClick() }
-    ) {
-        Box(
-            // Box ini hanya untuk mengatur posisi tag agar sedikit keluar
-            modifier = Modifier.padding(top = 8.dp, start = 8.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(60.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    painter = painterResource(id = category.iconResId),
-                    contentDescription = category.name,
-                    modifier = Modifier.size(40.dp).offset(x= (-5).dp)
-
-                )
-            }
-            // Tag promo di atas ikon
-            if (category.tag != null) {
-                Text(
-                    text = category.tag,
-                    color = Color.White,
-                    fontWeight = FontWeight.Normal,
-                    fontSize = 11.sp,
-                    modifier = Modifier
-                        .align(Alignment.TopStart) // 1. Posisi di kiri atas
-                        .offset(x = (-14).dp, y = (-16).dp) // 2. Digeser agar "menggantung"
-                        .background(
-                            color = Color(0xFF272343), // 3. Warna diubah sesuai gambar
-                            shape = TagShape() // 4. Gunakan Shape kustom kita
-                        )
-                        .padding(horizontal = 5.dp, vertical = 0.dp)
-                )
-            }
-        }
-        Text(text = category.name, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-    }
-}
-@Composable
-fun RecentHistoryList() {
-    // Mock data untuk riwayat perjalanan
-    val history = listOf(
-        HistoryItem("Fakultas Kedokteran - Unsoed", "Jl. Dr. Gumbreg No.1, Mersi, Purwokerto..."),
-        HistoryItem("Moro Mall", "Jl. Perintis Kemerdekaan, Purwokerto...")
-    )
-
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        history.forEach { item ->
-            HistoryRowItem(item = item)
-        }
-    }
-}
-
-@Composable
-fun HistoryRowItem(item: HistoryItem) {
-    Column {
-        HorizontalDivider(thickness = 1.dp, color = Color.LightGray, modifier = Modifier.padding(bottom = 14.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                painter = painterResource(id = R.drawable.locatio_icon),
-                tint = colorResource(R.color.unsoed),
-                contentDescription = "Riwayat",
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(text = item.title, fontWeight = FontWeight.Medium)
-        }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(text = item.address, fontSize = 14.sp, color = Color.Gray)
-
     }
 }
 
@@ -364,63 +291,6 @@ class TagShape(
             close()
         }
         return Outline.Generic(path)
-    }
-}
-
-@Composable
-fun BannerSlider() {
-    // 1. Siapkan data banner (ganti dengan gambar Anda di folder drawable)
-    val promoBanners = listOf(
-        R.drawable.car_banner,
-        R.drawable.motor_banner,
-        R.drawable.cleaning_banner
-    )
-
-    // 2. Buat PagerState untuk mengontrol pager
-    val pagerState = rememberPagerState(pageCount = { promoBanners.size })
-
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        // 3. Komponen HorizontalPager untuk slider
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(horizontal = 16.dp) // Agar banner di samping terlihat sedikit
-        ) { page ->
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp) // Jarak antar banner
-            ) {
-                Image(
-                    painter = painterResource(id = promoBanners[page]),
-                    contentDescription = "Promo Banner ${page + 1}",
-                    contentScale = ContentScale.Crop, // Agar gambar memenuhi card
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(140.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // 4. Indikator titik-titik di bawah slider
-        Row(
-            horizontalArrangement = Arrangement.Center,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            repeat(pagerState.pageCount) { index ->
-                val color = if (pagerState.currentPage == index) MaterialTheme.colorScheme.primary else Color.LightGray
-                Box(
-                    modifier = Modifier
-                        .padding(4.dp)
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(color)
-                )
-            }
-        }
     }
 }
 
