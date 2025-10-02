@@ -29,7 +29,7 @@ fun SplashScreen(navController: NavController) {
                 .addOnSuccessListener { document ->
                     val userRole = document.getString("role")
                     val destination = when (userRole) {
-                        "penumpang" -> Screen.PassengerHome.route
+                        "penumpang" -> Screen.PassengerMain.route
                         "driver" -> Screen.DriverHome.route
                         else -> Screen.Login.route // Fallback jika role tidak ditemukan
                     }

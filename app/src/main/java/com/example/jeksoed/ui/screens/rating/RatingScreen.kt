@@ -37,7 +37,7 @@ fun RatingScreen(
             when (event) {
                 is RatingNavEvent.NavigateToHome -> {
                     Toast.makeText(context, "Terima kasih atas ulasan Anda!", Toast.LENGTH_LONG).show()
-                    navController.navigate(Screen.PassengerHome.route) {
+                    navController.navigate(Screen.PassengerMain.route) {
                         popUpTo(navController.graph.startDestinationId) { inclusive = true }
                     }
                 }

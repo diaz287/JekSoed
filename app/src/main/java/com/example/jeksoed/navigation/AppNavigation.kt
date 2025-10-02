@@ -9,18 +9,20 @@ import androidx.navigation.navArgument
 import com.example.jeksoed.ui.screens.splash.SplashScreen
 import com.example.jeksoed.ui.screens.auth.LoginScreen
 import com.example.jeksoed.ui.screens.auth.RegisterScreen
-import com.example.jeksoed.ui.screens.passenger.PassengerHomeScreen
 import com.example.jeksoed.ui.screens.driver.DriverHomeScreen
 import com.example.jeksoed.ui.screens.passenger.FindingDriverScreen
 import com.example.jeksoed.ui.screens.rating.RatingScreen
 import com.example.jeksoed.ui.screens.trip.TripScreen
 import com.example.jeksoed.ui.screens.chat.ChatScreen
+import com.example.jeksoed.ui.screens.passenger.OrderScreen
+import com.example.jeksoed.ui.screens.passenger.PassengerMainScreen
 
 sealed class Screen(val route: String) {
     object Splash : Screen("splash")
     object Login : Screen("login")
     object Register : Screen("register")
-    object PassengerHome : Screen("passenger_home")
+    object PassengerMain : Screen("passenger_main")
+    object CreateOrder : Screen("create_order")
     object DriverHome : Screen("driver_home")
     object FindingDriver : Screen("finding_driver/{rideRequestId}") {
         fun createRoute(rideRequestId: String) = "finding_driver/$rideRequestId"
@@ -43,7 +45,8 @@ fun AppNavigation() {
         composable(Screen.Splash.route) { SplashScreen(navController) }
         composable(Screen.Login.route) { LoginScreen(navController) }
         composable(Screen.Register.route) { RegisterScreen(navController) }
-        composable(Screen.PassengerHome.route) { PassengerHomeScreen(navController) }
+        composable(Screen.PassengerMain.route) { PassengerMainScreen(navController) }
+        composable(Screen.CreateOrder.route) { OrderScreen(navController)}
         composable(Screen.DriverHome.route) { DriverHomeScreen(navController) }
         composable(Screen.FindingDriver.route) { backStackEntry ->
             val rideRequestId = backStackEntry.arguments?.getString("rideRequestId")
@@ -77,3 +80,4 @@ fun AppNavigation() {
 
     }
 }
+

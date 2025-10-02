@@ -31,7 +31,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -104,7 +103,7 @@ import com.example.jeksoed.utils.formatCurrency
  * =================================================================================
  */
 @Composable
-fun PassengerHomeScreen(
+fun OrderScreen(
     navController: NavController,
     auth: FirebaseAuth = FirebaseAuth.getInstance(),
     firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
@@ -224,7 +223,7 @@ fun PassengerHomeScreen(
         }
     }
 
-    PassengerHomeScreenUI(
+    OrderScreenUI(
         hasPermission = hasLocationPermission,
         cameraPositionState = cameraPositionState,
         userLocation = userLocation,
@@ -273,19 +272,13 @@ fun PassengerHomeScreen(
                     .addOnSuccessListener { docRef ->
                         isCreatingOrder = false
                         navController.navigate(Screen.FindingDriver.createRoute(docRef.id)) {
-                            popUpTo(Screen.PassengerHome.route) { inclusive = true }
+                            popUpTo(Screen.CreateOrder.route) { inclusive = true }
                         }
                     }
                     .addOnFailureListener { e ->
                         isCreatingOrder = false
                         Toast.makeText(context, "Gagal membuat order: ${e.message}", Toast.LENGTH_LONG).show()
                     }
-            }
-        },
-        onLogoutClick = {
-            auth.signOut()
-            navController.navigate(Screen.Login.route) {
-                popUpTo(Screen.PassengerHome.route) { inclusive = true }
             }
         }
     )
@@ -300,7 +293,7 @@ fun PassengerHomeScreen(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PassengerHomeScreenUI(
+fun OrderScreenUI(
     hasPermission: Boolean,
     cameraPositionState: com.google.maps.android.compose.CameraPositionState,
     userLocation: LatLng?,
@@ -315,17 +308,11 @@ fun PassengerHomeScreenUI(
     onClearSearch: () -> Unit,
     onPredictionClick: (AutocompletePrediction) -> Unit,
     onCreateOrderClick: () -> Unit,
-    onLogoutClick: () -> Unit
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("JekSoed Penumpang") },
-                actions = {
-                    Button(onClick = onLogoutClick) {
-                        Text("Logout")
-                    }
-                }
             )
         }
     ) { paddingValues ->
@@ -519,9 +506,9 @@ private val DUMMY_PREDICTIONS = listOf(
  */
 @Preview(name = "UI State: No Permission", showBackground = true)
 @Composable
-private fun PassengerHomePreview_NoPermission() {
+private fun OrderPreview_NoPermission() {
     JekSoedTheme {
-        PassengerHomeScreenUI(
+        OrderScreenUI(
             hasPermission = false, // <-- State Kunci
             cameraPositionState = rememberCameraPositionState(),
             userLocation = null,
@@ -532,7 +519,7 @@ private fun PassengerHomePreview_NoPermission() {
             predictions = emptyList(),
             isCreatingOrder = false,
             onPermissionRequest = {}, onSearchQueryChange = {}, onClearSearch = {},
-            onPredictionClick = {}, onCreateOrderClick = {}, onLogoutClick = {}
+            onPredictionClick = {}, onCreateOrderClick = {},
         )
     }
 }
@@ -543,9 +530,9 @@ private fun PassengerHomePreview_NoPermission() {
  */
 @Preview(name = "UI State: Idle With Map", showBackground = true)
 @Composable
-private fun PassengerHomePreview_IdleWithMap() {
+private fun OrderPreview_IdleWithMap() {
     JekSoedTheme {
-        PassengerHomeScreenUI(
+        OrderScreenUI(
             hasPermission = true, // <-- State Kunci
             cameraPositionState = rememberCameraPositionState(),
             userLocation = DUMMY_USER_LOCATION, // <-- State Kunci
@@ -556,7 +543,7 @@ private fun PassengerHomePreview_IdleWithMap() {
             predictions = emptyList(),
             isCreatingOrder = false,
             onPermissionRequest = {}, onSearchQueryChange = {}, onClearSearch = {},
-            onPredictionClick = {}, onCreateOrderClick = {}, onLogoutClick = {}
+            onPredictionClick = {}, onCreateOrderClick = {},
         )
     }
 }
@@ -608,9 +595,9 @@ private fun SearchUI_Preview_WithPredictions() {
  */
 @Preview(name = "UI State: Route Found", showBackground = true)
 @Composable
-private fun PassengerHomePreview_RouteFound() {
+private fun OrderPreview_RouteFound() {
     JekSoedTheme {
-        PassengerHomeScreenUI(
+        OrderScreenUI(
             hasPermission = true,
             cameraPositionState = rememberCameraPositionState(),
             userLocation = DUMMY_USER_LOCATION,
@@ -621,7 +608,7 @@ private fun PassengerHomePreview_RouteFound() {
             predictions = emptyList(),
             isCreatingOrder = false, // <-- State Kunci
             onPermissionRequest = {}, onSearchQueryChange = {}, onClearSearch = {},
-            onPredictionClick = {}, onCreateOrderClick = {}, onLogoutClick = {}
+            onPredictionClick = {}, onCreateOrderClick = {},
         )
     }
 }
@@ -632,9 +619,9 @@ private fun PassengerHomePreview_RouteFound() {
  */
 @Preview(name = "UI State: Creating Order", showBackground = true)
 @Composable
-private fun PassengerHomePreview_CreatingOrder() {
+private fun OrderPreview_CreatingOrder() {
     JekSoedTheme {
-        PassengerHomeScreenUI(
+        OrderScreenUI(
             hasPermission = true,
             cameraPositionState = rememberCameraPositionState(),
             userLocation = DUMMY_USER_LOCATION,
@@ -645,7 +632,7 @@ private fun PassengerHomePreview_CreatingOrder() {
             predictions = emptyList(),
             isCreatingOrder = true, // <-- State Kunci
             onPermissionRequest = {}, onSearchQueryChange = {}, onClearSearch = {},
-            onPredictionClick = {}, onCreateOrderClick = {}, onLogoutClick = {}
+            onPredictionClick = {}, onCreateOrderClick = {},
         )
     }
 }
