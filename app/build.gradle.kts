@@ -93,4 +93,9 @@ dependencies {
     implementation("com.google.maps.android:android-maps-utils:3.8.0")
     implementation("androidx.compose.material:material-icons-extended:1.7.0")
     implementation("com.google.firebase:firebase-messaging-ktx:24.0.1")
+    // Tambahkan ini untuk animasi navigasi
+    implementation("com.google.accompanist:accompanist-navigation-animation:0.32.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+
 }

@@ -3,642 +3,386 @@ package com.example.jeksoed.ui.screens.passenger
 import android.Manifest
 import android.content.pm.PackageManager
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.jeksoed.data.model.RouteInfo
-import com.example.jeksoed.navigation.Screen
+import androidx.navigation.compose.rememberNavController
+import com.example.jeksoed.R
+import com.example.jeksoed.ui.screens.passenger.components.OrderSheetContent
+import com.example.jeksoed.ui.theme.JekSoedTheme
+import com.example.jeksoed.utils.bitmapDescriptorFromVector
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
 import com.google.android.libraries.places.api.Places
-import com.google.android.libraries.places.api.model.AutocompletePrediction
-import com.google.android.libraries.places.api.model.Place
-import com.google.android.libraries.places.api.net.FetchPlaceRequest
-import com.google.android.libraries.places.api.net.FindAutocompletePredictionsRequest
-import com.google.android.libraries.places.api.net.PlacesClient
-import com.google.maps.DirectionsApi
-import com.google.maps.GeoApiContext
-import com.google.maps.android.PolyUtil
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.MarkerState
-import com.google.maps.android.compose.Polyline
-import com.google.maps.android.compose.rememberCameraPositionState
-import com.google.maps.model.TravelMode
-import kotlinx.coroutines.Dispatchers
+import com.google.maps.android.compose.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withContext
-import com.google.firebase.Timestamp
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.delay
-import androidx.compose.ui.tooling.preview.Preview
-import com.example.jeksoed.ui.theme.JekSoedTheme
-import com.example.jeksoed.utils.calculatePrice
-import com.example.jeksoed.utils.formatCurrency
+import com.example.jeksoed.utils.bitmapDescriptorFromComposable
+import com.google.android.gms.maps.model.BitmapDescriptor
 
 /**
  * =================================================================================
- * SMART COMPOSABLE
- * - Mengelola SEMUA state (lokasi, pencarian, rute, loading, dll).
- * - Menangani SEMUA logic & side effects (izin lokasi, API calls, Firestore writes).
+ * 1. SMART COMPOSABLE (SCREEN-LEVEL)
  * =================================================================================
+ * Tugasnya:
+ * - Mengelola state dan ViewModel.
+ * - Menangani semua logika (permintaan izin, lokasi, API key).
+ * - Memanggil Dumb Composable (OrderScreenLayout) untuk menampilkan UI.
  */
+
+@Composable
+private fun TopRouteInfoBar(pickup: String, destination: String) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, top = 48.dp),
+        shape = RoundedCornerShape(24.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
+        Column(modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)) {
+            RouteInfoRow(icon = R.drawable.blue_icon, text = pickup)
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp, horizontal = 12.dp))
+            RouteInfoRow(icon = R.drawable.locatio_icon, text = destination)
+        }
+    }
+}
+
+@Composable
+private fun RouteInfoRow(icon: Int, text: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(vertical = 8.dp, horizontal = 12.dp)
+    ) {
+        Icon(
+            painter = painterResource(id = icon),
+            contentDescription = null,
+            modifier = Modifier.size(24.dp),
+            tint = Color.Unspecified
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(text = text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun OrderScreen(
     navController: NavController,
-    auth: FirebaseAuth = FirebaseAuth.getInstance(),
-    firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
+    orderViewModel: OrderViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    val keyboardController = LocalSoftwareKeyboardController.current
-    val placesClient: PlacesClient = remember { Places.createClient(context) }
+    val uiState by orderViewModel.uiState.collectAsState()
+    val scope = rememberCoroutineScope()
 
-    // --- State Management ---
     var hasLocationPermission by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) }
-    var userLocation by remember { mutableStateOf<LatLng?>(null) }
-    val cameraPositionState = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(LatLng(-7.431, 109.245), 12f) } // Default Purwokerto
+    val cameraPositionState = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(LatLng(-7.431, 109.245), 15f) }
+    val bottomSheetState = rememberBottomSheetScaffoldState()
 
-    var searchQuery by remember { mutableStateOf("") }
-    var predictions by remember { mutableStateOf<List<AutocompletePrediction>>(emptyList()) }
-    var destinationLocation by remember { mutableStateOf<LatLng?>(null) }
-    var routeInfo by remember { mutableStateOf<RouteInfo?>(null) }
-    var isSearching by remember { mutableStateOf(false) }
-    var isCreatingOrder by remember { mutableStateOf(false) }
+    val expandSheet: () -> Unit = {
+        scope.launch {
+            bottomSheetState.bottomSheetState.expand()
+        }
+    }
 
-    // --- Logic & Side Effects ---
+    val placesClient = remember { Places.createClient(context) }
+    val apiKey = remember {
+        context.packageManager.getApplicationInfo(context.packageName, PackageManager.GET_META_DATA)
+            .metaData.getString("com.google.android.geo.API_KEY") ?: ""
+    }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
         onResult = { isGranted -> hasLocationPermission = isGranted }
     )
 
-    LaunchedEffect(hasLocationPermission) {
+    val configuration = LocalConfiguration.current
+    val screenHeight = configuration.screenHeightDp.dp
+
+    val isKeyboardOpen by rememberUpdatedState(WindowInsets.isImeVisible)
+    LaunchedEffect(isKeyboardOpen) {
+        if (isKeyboardOpen) {
+            scope.launch {
+                bottomSheetState.bottomSheetState.expand()
+            }
+        }
+    }
+
+    LaunchedEffect(key1 = hasLocationPermission) {
         if (hasLocationPermission) {
             try {
                 val location = LocationServices.getFusedLocationProviderClient(context).lastLocation.await()
-                if (location != null) {
-                    userLocation = LatLng(location.latitude, location.longitude)
+                location?.let {
+                    val latLng = LatLng(it.latitude, it.longitude)
+                    orderViewModel.setUserLocationAsPickup(latLng)
+                    cameraPositionState.animate(CameraUpdateFactory.newCameraPosition(CameraPosition.fromLatLngZoom(latLng, 15f)))
                 }
-            } catch (e: Exception) { Log.e("LocationError", "Gagal mendapatkan lokasi", e) }
+            } catch (e: Exception) { Log.e("OrderScreen", "Gagal mendapatkan lokasi", e) }
         } else {
             permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
     }
 
-    val currentQuery by rememberUpdatedState(searchQuery)
-
-    LaunchedEffect(currentQuery) {
-        if (currentQuery.length > 2) {
-            isSearching = true
-            delay(300L) // debounce
-
-            try {
-                val request = FindAutocompletePredictionsRequest.builder()
-                    .setQuery(currentQuery)
-                    .setCountries("ID")
-                    .build()
-
-                val response = placesClient.findAutocompletePredictions(request).await()
-                predictions = response.autocompletePredictions
-            } catch (e: Exception) {
-                Log.e("PlacesAPI", "Gagal mencari prediksi", e)
-            } finally {
-                isSearching = false
-            }
-        } else {
-            predictions = emptyList()
-        }
-    }
-
-
-    LaunchedEffect(destinationLocation) {
-        if (userLocation != null && destinationLocation != null) {
-            coroutineScope.launch {
-                try {
-                    val apiKey = context.packageManager.getApplicationInfo(context.packageName, PackageManager.GET_META_DATA)
-                        .metaData.getString("com.google.android.geo.API_KEY")
-
-                    val geoApiContext = GeoApiContext.Builder().apiKey(apiKey).build()
-                    val directionsResult = withContext(Dispatchers.IO) {
-                        DirectionsApi.newRequest(geoApiContext)
-                            .origin(com.google.maps.model.LatLng(userLocation!!.latitude, userLocation!!.longitude))
-                            .destination(com.google.maps.model.LatLng(destinationLocation!!.latitude, destinationLocation!!.longitude))
-                            .mode(TravelMode.DRIVING)
-                            .await()
-                    }
-
-                    if (directionsResult.routes.isNotEmpty()) {
-                        val route = directionsResult.routes[0]
-                        val leg = route.legs[0]
-                        val points = PolyUtil.decode(route.overviewPolyline.encodedPath)
-                        val priceValue = calculatePrice(leg.distance.inMeters)
-                        val formattedPrice = formatCurrency(priceValue)
-
-                        routeInfo = RouteInfo(
-                            distance = leg.distance.humanReadable,
-                            duration = leg.duration.humanReadable,
-                            polylinePoints = points,
-                            encodedPath = route.overviewPolyline.encodedPath,
-                            price = formattedPrice
-                        )
-                    } else {
-                        Toast.makeText(context, "Tidak dapat menemukan rute.", Toast.LENGTH_SHORT).show()
-                    }
-
-                } catch (e: Exception) {
-                    Log.e("DirectionsAPI", "Gagal mendapatkan rute", e)
-                    Toast.makeText(context, "Error saat mencari rute: ${e.message}", Toast.LENGTH_LONG).show()
-                }
+    LaunchedEffect(uiState.routeInfo) {
+        if (uiState.routeInfo != null) {
+            val pickup = uiState.pickupLocation
+            val destination = uiState.destinationLocation
+            if (pickup != null && destination != null) {
+                val bounds = LatLngBounds.builder().include(pickup).include(destination).build()
+                cameraPositionState.animate(CameraUpdateFactory.newLatLngBounds(bounds, 150))
             }
         }
     }
 
-    LaunchedEffect(routeInfo) {
-        if (routeInfo != null) {
-            val bounds = LatLngBounds.builder()
-                .include(userLocation!!)
-                .include(destinationLocation!!)
-                .build()
-            cameraPositionState.animate(
-                CameraUpdateFactory.newLatLngBounds(bounds, 150)
-            )
-        } else if (userLocation != null) {
-            cameraPositionState.animate(
-                CameraUpdateFactory.newLatLngZoom(userLocation!!, 15f)
-            )
-        }
-    }
-
-    OrderScreenUI(
-        hasPermission = hasLocationPermission,
+    // Memanggil Dumb Composable untuk menampilkan UI
+    OrderScreenLayout(
+        uiState = uiState,
         cameraPositionState = cameraPositionState,
-        userLocation = userLocation,
-        destinationLocation = destinationLocation,
-        routeInfo = routeInfo,
-        searchQuery = searchQuery,
-        isSearching = isSearching,
-        predictions = predictions,
-        isCreatingOrder = isCreatingOrder,
-        onPermissionRequest = { permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION) },
-        onSearchQueryChange = { newQuery -> searchQuery = newQuery },
-        onClearSearch = { searchQuery = "" },
-        onPredictionClick = { prediction ->
-            keyboardController?.hide()
-            val request = FetchPlaceRequest.newInstance(prediction.placeId, listOf(Place.Field.LAT_LNG))
-            coroutineScope.launch {
-                try {
-                    val response = placesClient.fetchPlace(request).await()
-                    destinationLocation = response.place.latLng
-                    searchQuery = ""
-                    predictions = emptyList()
-                } catch (e: Exception) { Log.e("PlacesAPI", "Gagal fetch place", e) }
+        bottomSheetState = bottomSheetState,
+        sheetPeekHeight = when (uiState.stage) {
+            OrderStage.SEARCHING -> screenHeight * 0.6f
+            OrderStage.PICKUP_CONFIRM -> 220.dp
+            OrderStage.ROUTE_CONFIRM -> screenHeight * 0.5f
+            OrderStage.FINDING_DRIVER -> 300.dp
+        },
+        // Tentukan aksi berdasarkan stage saat ini
+        onBackClick = {
+            if (uiState.stage == OrderStage.ROUTE_CONFIRM || uiState.stage == OrderStage.PICKUP_CONFIRM) {
+                orderViewModel.goBackToSearch()
+            } else {
+                navController.popBackStack()
             }
         },
-        onCreateOrderClick = {
-            if (userLocation != null && destinationLocation != null && routeInfo != null) {
-                isCreatingOrder = true
-                val rideRequest = hashMapOf(
-                    "passengerId" to auth.currentUser?.uid,
-                    "pickupLocation" to hashMapOf(
-                        "latitude" to userLocation!!.latitude,
-                        "longitude" to userLocation!!.longitude
-                    ),
-                    "destinationLocation" to hashMapOf(
-                        "latitude" to destinationLocation!!.latitude,
-                        "longitude" to destinationLocation!!.longitude
-                    ),
-                    "distance" to routeInfo!!.distance,
-                    "duration" to routeInfo!!.duration,
-                    "status" to "pending",
-                    "createdAt" to Timestamp.now(),
-                    "driverId" to null,
-                    "encodedPolyline" to routeInfo!!.encodedPath
-                )
-                firestore.collection("ride_requests").add(rideRequest)
-                    .addOnSuccessListener { docRef ->
-                        isCreatingOrder = false
-                        navController.navigate(Screen.FindingDriver.createRoute(docRef.id)) {
-                            popUpTo(Screen.CreateOrder.route) { inclusive = true }
-                        }
-                    }
-                    .addOnFailureListener { e ->
-                        isCreatingOrder = false
-                        Toast.makeText(context, "Gagal membuat order: ${e.message}", Toast.LENGTH_LONG).show()
-                    }
-            }
+        sheetContent = {
+            OrderSheetContent(
+                uiState = uiState,
+                viewModel = orderViewModel,
+                placesClient = placesClient,
+                apiKey = apiKey,
+                onTextFieldFocus = expandSheet
+            )
         }
     )
 }
 
 /**
  * =================================================================================
- * DUMB UI COMPOSABLE
- * - Bertanggung jawab untuk menyusun layout utama (Peta, Search bar, Info card).
- * - Menerima semua state dan meneruskan semua event.
+ * 2. DUMB COMPOSABLE (UI-ONLY)
  * =================================================================================
+ * Tugasnya:
+ * - Hanya menampilkan UI berdasarkan parameter yang diberikan.
+ * - Tidak tahu-menahu tentang ViewModel atau logika bisnis.
+ * - Mudah untuk di-preview.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun OrderScreenUI(
-    hasPermission: Boolean,
-    cameraPositionState: com.google.maps.android.compose.CameraPositionState,
-    userLocation: LatLng?,
-    destinationLocation: LatLng?,
-    routeInfo: RouteInfo?,
-    searchQuery: String,
-    isSearching: Boolean,
-    predictions: List<AutocompletePrediction>,
-    isCreatingOrder: Boolean,
-    onPermissionRequest: () -> Unit,
-    onSearchQueryChange: (String) -> Unit,
-    onClearSearch: () -> Unit,
-    onPredictionClick: (AutocompletePrediction) -> Unit,
-    onCreateOrderClick: () -> Unit,
+private fun OrderScreenLayout(
+    uiState: OrderUiState,
+    cameraPositionState: CameraPositionState,
+    bottomSheetState: BottomSheetScaffoldState,
+    sheetPeekHeight: Dp,
+    onBackClick: () -> Unit,
+    sheetContent: @Composable ColumnScope.() -> Unit
 ) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("JekSoed Penumpang") },
-            )
+    val context = LocalContext.current
+    var pickupMarker by remember { mutableStateOf<BitmapDescriptor?>(null) }
+
+    // --- BUAT MARKER SECARA ASYNC SAAT KOMPOSISI ---
+    LaunchedEffect(Unit) {
+        pickupMarker = bitmapDescriptorFromComposable(context) {
+            PickupMarkerComposable()
         }
-    ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-            if (hasPermission) {
-                GoogleMap(
-                    modifier = Modifier.fillMaxSize(),
-                    cameraPositionState = cameraPositionState
-                ) {
-                    userLocation?.let { Marker(state = MarkerState(position = it), title = "Lokasi Saya") }
-                    destinationLocation?.let { Marker(state = MarkerState(position = it), title = "Tujuan") }
-                    routeInfo?.let { Polyline(points = it.polylinePoints, color = Color.Blue, width = 15f) }
+    }
+
+
+    BottomSheetScaffold(
+        scaffoldState = bottomSheetState,
+        sheetPeekHeight = sheetPeekHeight,
+        sheetShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        sheetContent = sheetContent
+    ) { padding ->
+        Box(modifier = Modifier.fillMaxSize().padding(padding).then( // Gunakan .then untuk menambahkan modifier secara kondisional
+            if (uiState.stage == OrderStage.FINDING_DRIVER)
+                Modifier.blur(radius = 8.dp)
+            else
+                Modifier
+        )) {
+            GoogleMap(
+                modifier = Modifier.fillMaxSize(),
+                cameraPositionState = cameraPositionState,
+                uiSettings = MapUiSettings(zoomControlsEnabled = false)
+            ) {
+                // --- GUNAKAN MARKER KUSTOM ---
+                if (pickupMarker != null) {
+                    uiState.pickupLocation?.let {
+                        Marker(
+                            state = MarkerState(position = it),
+                            title = "Lokasi Jemput",
+                            icon = pickupMarker
+                        )
+                    }
                 }
-            } else {
-                PermissionRequestUI(onRequest = onPermissionRequest)
+
+                // --- MARKER TUJUAN (BAWAAN) ---
+                uiState.destinationLocation?.let {
+                    Marker(
+                        state = MarkerState(position = it),
+                        title = "Lokasi Tujuan"
+                        // Tidak ada 'icon', jadi pakai default
+                    )
+                }
+
+                // --- TAMBAHKAN MARKER DRIVER ---
+                uiState.driverLocations.forEach { driverLatLng ->
+                    Marker(
+                        state = MarkerState(position = driverLatLng),
+                        title = "Driver",
+                        icon = bitmapDescriptorFromVector(context, R.drawable.motor_icon)
+                    )
+                }
+                uiState.routeInfo?.let {
+                    Polyline(points = it.polylinePoints, color = MaterialTheme.colorScheme.primary, width = 15f)
+                }
             }
-
-            SearchUI(
-                searchQuery = searchQuery,
-                isSearching = isSearching,
-                predictions = predictions,
-                onQueryChange = onSearchQueryChange,
-                onClear = onClearSearch,
-                onPredictionClick = onPredictionClick
-            )
-
-            AnimatedVisibility(visible = routeInfo != null, modifier = Modifier.align(Alignment.BottomCenter)) {
-                RouteInfoCard(
-                    routeInfo = routeInfo!!,
-                    isCreatingOrder = isCreatingOrder,
-                    onOrderClick = onCreateOrderClick
+            if (uiState.stage == OrderStage.ROUTE_CONFIRM || uiState.stage == OrderStage.FINDING_DRIVER) {
+                TopRouteInfoBar(
+                    pickup = uiState.pickupQuery,
+                    destination = uiState.destinationQuery
                 )
             }
+
+            // Aturan untuk tombol kembali
+            if (uiState.stage == OrderStage.ROUTE_CONFIRM) {
+                // Tombol kembali di atas sheet untuk RouteConfirm
+                IconButton(
+                    onClick = onBackClick,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 16.dp, bottom = sheetPeekHeight + 16.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surface)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
+                }
+            } else if (uiState.stage != OrderStage.FINDING_DRIVER) {
+                // Tombol kembali di atas untuk semua stage lain, KECUALI FindingDriver
+                IconButton(
+                    onClick = onBackClick,
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp, vertical = 32.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surface)
+                        .align(Alignment.TopStart)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
+                }
+            }
         }
     }
 }
-
 @Composable
-private fun PermissionRequestUI(onRequest: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+fun PickupMarkerComposable() {
+    Box(
+        modifier = Modifier.wrapContentSize(),
+        contentAlignment = Alignment.TopCenter
     ) {
-        Text("Izin lokasi dibutuhkan untuk menampilkan peta.")
-        Button(onClick = onRequest) { Text("Berikan Izin") }
-    }
-}
-
-@Composable
-private fun SearchUI(
-    searchQuery: String,
-    isSearching: Boolean,
-    predictions: List<AutocompletePrediction>,
-    onQueryChange: (String) -> Unit,
-    onClear: () -> Unit,
-    onPredictionClick: (AutocompletePrediction) -> Unit
-) {
-    val keyboardController = LocalSoftwareKeyboardController.current
-
-    Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
-        TextField(
-            value = searchQuery,
-            onValueChange = onQueryChange,
-            placeholder = { Text("Mau ke mana?") },
+        // Lingkaran luar (border transparan) dan dalam (biru)
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .background(Color.White, RoundedCornerShape(8.dp))
-                .border(1.dp, Color.LightGray, RoundedCornerShape(8.dp)),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() }),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White,
-                disabledContainerColor = Color.White,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent
-            ),
-            trailingIcon = {
-                if (isSearching) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                } else if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = onClear) { Icon(Icons.Default.Close, "Hapus") }
-                }
-            }
+                .padding(top = 10.dp) // Beri ruang untuk foto profil
+                .size(70.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.5f))
+                .padding(4.dp)
+                .clip(CircleShape)
+                .background(Color(0xFF3386FF)) // Warna biru
         )
-        AnimatedVisibility(visible = predictions.isNotEmpty()) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White, RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp))
-                    .border(1.dp, Color.LightGray, RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp))
-            ) {
-                items(predictions) { prediction ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onPredictionClick(prediction) }
-                            .padding(16.dp)
-                    ) {
-                        Text(prediction.getPrimaryText(null).toString(), fontWeight = FontWeight.Bold)
-                        Text(prediction.getSecondaryText(null).toString(), fontSize = 12.sp)
-                    }
-                    HorizontalDivider()
-                }
+
+        // Foto Profil
+        Image(
+            painter = painterResource(id = R.drawable.person_icon), // Ganti dengan gambar profil asli jika ada
+            contentDescription = "Profil",
+            modifier = Modifier
+                .size(50.dp)
+                .clip(CircleShape)
+                .border(3.dp, Color.White, CircleShape)
+        )
+
+        // Segitiga Pin di bawah
+        Canvas(modifier = Modifier
+            .size(20.dp, 10.dp)
+            .align(Alignment.BottomCenter)
+            .offset(y = (4).dp)
+        ) {
+            val path = Path().apply {
+                moveTo(size.width / 2f, size.height)
+                lineTo(0f, 0f)
+                lineTo(size.width, 0f)
+                close()
             }
+            drawPath(path, color = Color.White)
         }
     }
 }
-
-@Composable
-private fun RouteInfoCard(
-    routeInfo: RouteInfo,
-    isCreatingOrder: Boolean,
-    onOrderClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(16.dp),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                "Siap Berangkat?",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceAround
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Estimasi Waktu", style = MaterialTheme.typography.bodySmall)
-                    Text(routeInfo.duration, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Jarak Tempuh", style = MaterialTheme.typography.bodySmall)
-                    Text(routeInfo.distance, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Harga", style = MaterialTheme.typography.bodySmall)
-                    Text(routeInfo?.price ?: "-", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = onOrderClick,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !isCreatingOrder
-            ) {
-                if (isCreatingOrder) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
-                } else {
-                    Text("Pesan Sekarang")
-                }
-            }
-        }
-    }
-}
-
-
-// Data class sederhana untuk data palsu, karena AutocompletePrediction sulit dibuat manual.
-private data class DummyPrediction(
-    val primaryText: String,
-    val secondaryText: String
-)
-
-// Data palsu untuk digunakan di berbagai preview
-private val DUMMY_USER_LOCATION = LatLng(-7.431, 109.245) // Purwokerto
-private val DUMMY_DESTINATION_LOCATION = LatLng(-7.420, 109.255)
-private val DUMMY_ROUTE_INFO = RouteInfo(distance = "5.2 km", duration = "15 min", polylinePoints = emptyList(), encodedPath = "dummy_encoded_path_string", price = "Rp 11.000")
-private val DUMMY_PREDICTIONS = listOf(
-    DummyPrediction("Alun-Alun Purwokerto", "Jl. Jend. Soedirman, Purwokerto"),
-    DummyPrediction("Stasiun Purwokerto", "Jl. Stasiun, Kober, Purwokerto Barat"),
-    DummyPrediction("Rita Supermall Purwokerto", "Jl. Jend. Soedirman No. 296")
-)
-
-
 /**
  * =================================================================================
- * KUMPULAN PREVIEW
+ * 3. PREVIEW
  * =================================================================================
+ * Tugasnya:
+ * - Memanggil Dumb Composable (OrderScreenLayout) dengan data palsu.
+ * - Tidak akan crash karena tidak menginisialisasi komponen runtime.
  */
-
-/**
- * Preview 1: Saat Izin Lokasi Belum Diberikan
- * Menampilkan tampilan awal yang meminta pengguna untuk memberikan izin.
- */
-@Preview(name = "UI State: No Permission", showBackground = true)
+@OptIn(ExperimentalMaterial3Api::class)
+@Preview(showBackground = true, showSystemUi = true)
 @Composable
-private fun OrderPreview_NoPermission() {
+fun OrderScreenPreview() {
     JekSoedTheme {
-        OrderScreenUI(
-            hasPermission = false, // <-- State Kunci
-            cameraPositionState = rememberCameraPositionState(),
-            userLocation = null,
-            destinationLocation = null,
-            routeInfo = null,
-            searchQuery = "",
-            isSearching = false,
-            predictions = emptyList(),
-            isCreatingOrder = false,
-            onPermissionRequest = {}, onSearchQueryChange = {}, onClearSearch = {},
-            onPredictionClick = {}, onCreateOrderClick = {},
-        )
-    }
-}
+        // Siapkan data dan state palsu untuk preview
+        val dummyUiState = OrderUiState(stage = OrderStage.SEARCHING)
+        val cameraPositionState = rememberCameraPositionState()
+        val bottomSheetState = rememberBottomSheetScaffoldState()
 
-/**
- * Preview 2: Kondisi Awal (Peta Siap)
- * Menampilkan peta setelah izin diberikan, sebelum pengguna melakukan aksi apa pun.
- */
-@Preview(name = "UI State: Idle With Map", showBackground = true)
-@Composable
-private fun OrderPreview_IdleWithMap() {
-    JekSoedTheme {
-        OrderScreenUI(
-            hasPermission = true, // <-- State Kunci
-            cameraPositionState = rememberCameraPositionState(),
-            userLocation = DUMMY_USER_LOCATION, // <-- State Kunci
-            destinationLocation = null,
-            routeInfo = null,
-            searchQuery = "",
-            isSearching = false,
-            predictions = emptyList(),
-            isCreatingOrder = false,
-            onPermissionRequest = {}, onSearchQueryChange = {}, onClearSearch = {},
-            onPredictionClick = {}, onCreateOrderClick = {},
-        )
-    }
-}
-
-/**
- * Preview 3: Saat Pengguna Mencari Lokasi
- * Menampilkan daftar hasil pencarian (predictions) di bawah search bar.
- * Kita buat preview khusus untuk SearchUI karena object `AutocompletePrediction` sulit dibuat.
- */
-@Preview(name = "Component State: Searching", showBackground = true)
-@Composable
-private fun SearchUI_Preview_WithPredictions() {
-    JekSoedTheme {
-        // Kita preview komponen SearchUI secara terisolasi
-        Column {
-            TextField(
-                value = "Purwokerto",
-                onValueChange = {},
-                placeholder = { Text("Mau ke mana?") },
-                modifier = Modifier.fillMaxWidth().padding(16.dp)
-            )
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .background(Color.White)
-                    .border(1.dp, Color.LightGray)
-            ) {
-                items(DUMMY_PREDICTIONS) { prediction ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Text(prediction.primaryText, fontWeight = FontWeight.Bold)
-                        Text(prediction.secondaryText, fontSize = 12.sp)
-                    }
-                    HorizontalDivider()
+        // Panggil OrderScreenLayout yang hanya butuh data, bukan ViewModel
+        OrderScreenLayout(
+            uiState = dummyUiState,
+            cameraPositionState = cameraPositionState,
+            bottomSheetState = bottomSheetState,
+            sheetPeekHeight = 400.dp, // Tinggi tetap untuk preview
+            onBackClick = {},
+            sheetContent = {
+                // Tampilkan placeholder sederhana untuk konten sheet
+                Box(modifier = Modifier.fillMaxWidth().height(400.dp), contentAlignment = Alignment.Center) {
+                    Text("Bottom Sheet Content Preview")
                 }
             }
-        }
-    }
-}
-
-
-/**
- * Preview 4: Rute Ditemukan & Siap Pesan
- * Ini adalah "happy path" utama, menampilkan kartu informasi rute di bagian bawah.
- */
-@Preview(name = "UI State: Route Found", showBackground = true)
-@Composable
-private fun OrderPreview_RouteFound() {
-    JekSoedTheme {
-        OrderScreenUI(
-            hasPermission = true,
-            cameraPositionState = rememberCameraPositionState(),
-            userLocation = DUMMY_USER_LOCATION,
-            destinationLocation = DUMMY_DESTINATION_LOCATION,
-            routeInfo = DUMMY_ROUTE_INFO, // <-- State Kunci
-            searchQuery = "",
-            isSearching = false,
-            predictions = emptyList(),
-            isCreatingOrder = false, // <-- State Kunci
-            onPermissionRequest = {}, onSearchQueryChange = {}, onClearSearch = {},
-            onPredictionClick = {}, onCreateOrderClick = {},
-        )
-    }
-}
-
-/**
- * Preview 5: Saat Proses Pembuatan Order
- * Menampilkan indikator loading di tombol "Pesan Sekarang".
- */
-@Preview(name = "UI State: Creating Order", showBackground = true)
-@Composable
-private fun OrderPreview_CreatingOrder() {
-    JekSoedTheme {
-        OrderScreenUI(
-            hasPermission = true,
-            cameraPositionState = rememberCameraPositionState(),
-            userLocation = DUMMY_USER_LOCATION,
-            destinationLocation = DUMMY_DESTINATION_LOCATION,
-            routeInfo = DUMMY_ROUTE_INFO,
-            searchQuery = "",
-            isSearching = false,
-            predictions = emptyList(),
-            isCreatingOrder = true, // <-- State Kunci
-            onPermissionRequest = {}, onSearchQueryChange = {}, onClearSearch = {},
-            onPredictionClick = {}, onCreateOrderClick = {},
         )
     }
 }

@@ -1,24 +1,15 @@
 package com.example.jeksoed.ui.screens.passenger
 
-import com.example.jeksoed.R
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -27,16 +18,15 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.jeksoed.R
 import com.example.jeksoed.navigation.Screen
 import com.example.jeksoed.ui.theme.JekSoedTheme
 
-
-// Data class untuk item di bottom bar
+// Data class untuk item di bottom bar (tidak perlu diubah)
 data class BottomNavItem(
     val title: String,
     val route: String,
-    val icon: Painter,
-    val iconVector: ImageVector? = null
+    val icon: Painter
 )
 
 @Composable
@@ -69,12 +59,11 @@ fun BottomNavigationBar(navController: NavHostController) {
 
         items.forEach { item ->
             NavigationBarItem(
-                icon = { Icon(item.icon, contentDescription = item.title,modifier = Modifier.size(24.dp) ) },
+                icon = { Icon(item.icon, contentDescription = item.title, modifier = Modifier.size(24.dp)) },
                 label = { Text(item.title) },
                 selected = currentRoute == item.route,
                 onClick = {
                     navController.navigate(item.route) {
-                        // Hindari menumpuk backstack saat menekan item yang sama
                         popUpTo(navController.graph.startDestinationId)
                         launchSingleTop = true
                     }
@@ -88,7 +77,10 @@ fun BottomNavigationBar(navController: NavHostController) {
 fun BottomNavGraph(mainNavController: NavController, bottomNavController: NavHostController) {
     NavHost(navController = bottomNavController, startDestination = "home") {
         composable("home") {
+            // --- PERUBAHAN 1 ---
+            // Teruskan navController utama ke HomeScreen
             HomeScreen(
+                navController = mainNavController,
                 onSearchClick = {
                     mainNavController.navigate(Screen.CreateOrder.route)
                 }
@@ -96,35 +88,32 @@ fun BottomNavGraph(mainNavController: NavController, bottomNavController: NavHos
         }
         composable("activity") { ActivityScreen() }
 
-        // Ganti placeholder dengan ProfileScreen yang baru
+        // --- PERUBAHAN 2 ---
+        // Panggil ProfileScreen yang benar dan teruskan navController utama
         composable("profil") {
-            // Kita butuh NavController utama untuk navigasi saat logout
             ProfileScreen(navController = mainNavController)
         }
     }
 }
 
-// --- Halaman Placeholder untuk Riwayat dan Profil ---
+// --- Halaman Placeholder untuk Riwayat ---
+// Hapus ProfilScreen placeholder karena kita sudah punya implementasi aslinya
 
 @Composable
 fun ActivityScreen() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = androidx.compose.ui.Alignment.Center
+    ) {
         Text("Halaman Riwayat Perjalanan")
     }
 }
 
-@Composable
-fun ProfilScreen() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text("Halaman Profil Pengguna")
-    }
-}
 
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 fun PassengerMainScreenPreview() {
     JekSoedTheme {
-        // Untuk preview, kita bisa menggunakan NavController palsu dari rememberNavController()
         PassengerMainScreen(mainNavController = rememberNavController())
     }
 }

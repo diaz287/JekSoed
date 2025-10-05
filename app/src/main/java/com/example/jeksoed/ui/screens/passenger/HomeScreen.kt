@@ -30,6 +30,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
@@ -39,7 +40,9 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
 import com.example.jeksoed.R // Pastikan import R ini benar
+import com.example.jeksoed.navigation.Screen
 import com.example.jeksoed.ui.screens.passenger.components.BannerSlider
 import com.example.jeksoed.ui.screens.passenger.components.CategoryGrid
 import com.example.jeksoed.ui.screens.passenger.components.RecentHistoryList
@@ -53,6 +56,7 @@ data class Category(val name: String, val iconResId: Int, val tag: String? = nul
 data class HistoryItem(val title: String, val address: String)
 @Composable
 fun HomeScreen(
+    navController: NavController,
     onSearchClick: () -> Unit
 ) {
     var showDialog by remember { mutableStateOf(false) }
@@ -134,8 +138,13 @@ fun HomeScreen(
                         Text("Kategori", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(40.dp))
                         CategoryGrid(onCategoryClick = { categoryName ->
-                            if (categoryName == "JekClean" || categoryName == "Lainnya") {
-                                showDialog = true
+                            when (categoryName) {
+                                "JekMotor" -> {
+                                    navController.navigate(Screen.CreateOrder.route)
+                                }
+                                "JekClean", "Lainnya", "JekMobil" -> {
+                                    showDialog = true
+                                }
                             }
                         })
                         Spacer(modifier = Modifier.height(24.dp))
@@ -147,12 +156,17 @@ fun HomeScreen(
                         Text("Baru baru ini...", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(12.dp))
                         RecentHistoryList()
+                        Spacer(modifier = Modifier.height(24.dp))
                     }
                 }
                 // Rekomendasi
                 item {
-                    Spacer(modifier = Modifier.height(24.dp))
-                    RecommendationSection()
+                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        Text("Cucu Jendral belum pernah kesini? Rugi dong!", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        RecommendationSection()
+                    }
+
                 }
             }
         }
@@ -227,77 +241,14 @@ fun DevelopmentDialog(onDismiss: () -> Unit) {
     )
 }
 
-class TagShape(
-    private val cornerRadius: Float = 16f,
-    private val pointerWidth: Float = 20f,
-    private val pointerHeight: Float = 20f
-) : Shape {
-    override fun createOutline(
-        size: Size,
-        layoutDirection: LayoutDirection,
-        density: Density
-    ): Outline {
-        val path = Path().apply {
-            // Lebar dan tinggi dari kotak utama (tanpa pointer)
-            val rectWidth = size.width
-            val rectHeight = size.height
-
-            // Mulai dari sudut kiri atas
-            moveTo(0f, cornerRadius)
-            // Gambar lengkungan sudut kiri atas
-            arcTo(
-                rect = androidx.compose.ui.geometry.Rect(0f, 0f, cornerRadius * 2, cornerRadius * 2),
-                startAngleDegrees = 180f,
-                sweepAngleDegrees = 90f,
-                forceMoveTo = false
-            )
-            // Garis lurus ke kanan atas
-            lineTo(rectWidth - cornerRadius, 0f)
-            // Gambar lengkungan sudut kanan atas
-            arcTo(
-                rect = androidx.compose.ui.geometry.Rect(rectWidth - cornerRadius * 2, 0f, rectWidth, cornerRadius * 2),
-                startAngleDegrees = 270f,
-                sweepAngleDegrees = 90f,
-                forceMoveTo = false
-            )
-            // Garis lurus ke kanan bawah
-            lineTo(rectWidth, rectHeight - cornerRadius)
-            // Gambar lengkungan sudut kanan bawah
-            arcTo(
-                rect = androidx.compose.ui.geometry.Rect(rectWidth - cornerRadius * 2, rectHeight - cornerRadius * 2, rectWidth, rectHeight),
-                startAngleDegrees = 0f,
-                sweepAngleDegrees = 90f,
-                forceMoveTo = false
-            )
-            // Garis lurus ke kiri bawah (sampai awal pointer)
-            lineTo(cornerRadius + pointerWidth, rectHeight)
-
-            // --- Bagian Pointer (segitiga di bawah) ---
-            lineTo(cornerRadius + (pointerWidth / 2), rectHeight + pointerHeight)
-            lineTo(cornerRadius, rectHeight)
-            // --- Akhir Bagian Pointer ---
-
-            // Garis lurus ke sudut kiri bawah
-            lineTo(cornerRadius, rectHeight)
-            // Gambar lengkungan sudut kiri bawah
-            arcTo(
-                rect = androidx.compose.ui.geometry.Rect(0f, rectHeight - cornerRadius * 2, cornerRadius * 2, rectHeight),
-                startAngleDegrees = 90f,
-                sweepAngleDegrees = 90f,
-                forceMoveTo = false
-            )
-
-            // Tutup path
-            close()
-        }
-        return Outline.Generic(path)
-    }
-}
 
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 fun HomeScreenPreview() {
     JekSoedTheme {
-        HomeScreen(onSearchClick = {})
+        HomeScreen(
+            onSearchClick = {},
+            navController = NavController(LocalContext.current)
+        )
     }
 }
