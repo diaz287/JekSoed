@@ -4,13 +4,21 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.lifecycle.ViewModel
+import androidx.navigation.NavController
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavType
-import androidx.navigation.compose.NavHost // Import NavHost yang standar
-import androidx.navigation.compose.composable // Import composable yang standar
-import androidx.navigation.compose.rememberNavController // Import rememberNavController yang standar
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.jeksoed.ui.screens.auth.CtaScreen
+import com.example.jeksoed.ui.screens.auth.ForgotPasswordScreen
 import com.example.jeksoed.ui.screens.auth.LoginScreen
-import com.example.jeksoed.ui.screens.auth.RegisterScreen
+import com.example.jeksoed.ui.screens.auth.RegisterPassengerScreen
+import com.example.jeksoed.ui.screens.auth.RoleSelectionScreen
+import com.example.jeksoed.ui.screens.auth.TncScreen
 import com.example.jeksoed.ui.screens.chat.ChatScreen
 import com.example.jeksoed.ui.screens.driver.DriverHomeScreen
 import com.example.jeksoed.ui.screens.passenger.FindingDriverScreen
@@ -19,12 +27,28 @@ import com.example.jeksoed.ui.screens.passenger.PassengerMainScreen
 import com.example.jeksoed.ui.screens.rating.RatingScreen
 import com.example.jeksoed.ui.screens.splash.SplashScreen
 import com.example.jeksoed.ui.screens.trip.TripScreen
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.compose.navigation
+import com.example.jeksoed.ui.screens.auth.RegisterDriverStep1Screen
+import com.example.jeksoed.ui.screens.auth.RegisterDriverStep2Screen
+import com.example.jeksoed.ui.screens.auth.RegisterDriverStep3Screen
+import com.example.jeksoed.ui.screens.auth.RegisterDriverViewModel
 
-// Sealed class Screen tetap sama
+// Sealed class Screen tidak perlu diubah
 sealed class Screen(val route: String) {
     object Splash : Screen("splash")
     object Login : Screen("login")
-    object Register : Screen("register")
+    object Cta : Screen("cta")
+    object Register : Screen("register/{role}") {
+        fun createRoute(role: String) = "register/$role"
+    }
+    object RegisterDriverGraph : Screen("register_driver_graph") // <-- GRAF NAVIGASI BARU
+    object RegisterDriverStep1 : Screen("register_driver_1")
+    object RegisterDriverStep2 : Screen("register_driver_2")
+    object RegisterDriverStep3 : Screen("register_driver_3")
+    object RoleSelection : Screen("role_selection")
+    object Tnc : Screen("tnc")
+    object ForgotPassword : Screen("forgot_password")
     object PassengerMain : Screen("passenger_main")
     object CreateOrder : Screen("create_order")
     object DriverHome : Screen("driver_home")
@@ -42,21 +66,41 @@ sealed class Screen(val route: String) {
     }
 }
 
-// Hapus anotasi @OptIn(ExperimentalAnimationApi::class)
+
 @Composable
 fun AppNavigation() {
-    // 1. Gunakan rememberNavController() yang standar
     val navController = rememberNavController()
 
-    // 2. Gunakan NavHost yang standar. Parameter animasi sekarang ada di dalam composable.
     NavHost(navController, startDestination = Screen.Splash.route) {
         composable(Screen.Splash.route) { SplashScreen(navController) }
+        composable(Screen.Cta.route) { CtaScreen(navController) }
         composable(Screen.Login.route) { LoginScreen(navController) }
-        composable(Screen.Register.route) { RegisterScreen(navController) }
+        composable(Screen.RoleSelection.route) { RoleSelectionScreen(navController) }
+        composable(Screen.Tnc.route) { TncScreen(navController) }
+        composable(Screen.ForgotPassword.route) { ForgotPasswordScreen(navController) }
+
+        // --- HANYA SATU BLOK COMPOSABLE UNTUK REGISTER ---
+        composable(
+            route = Screen.Register.route,
+            arguments = listOf(navArgument("role") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val role = backStackEntry.arguments?.getString("role") ?: "penumpang"
+            if (role == "penumpang") {
+                RegisterPassengerScreen(navController = navController)
+            } else {
+                // Arahkan ke awal alur registrasi driver
+                navController.navigate(Screen.RegisterDriverGraph.route)
+            }
+        }
+
+        // --- TAMBAHKAN NESTED NAVIGATION GRAPH UNTUK REGISTRASI DRIVER ---
+        driverRegistrationGraph(navController)
+
+        // --- BLOK YANG DIDUPLIKASI DAN SALAH SUDAH DIHAPUS ---
+
         composable(Screen.PassengerMain.route) { PassengerMainScreen(navController) }
         composable(Screen.DriverHome.route) { DriverHomeScreen(navController) }
 
-        // 3. Definisi transisi sekarang menjadi parameter dari fungsi composable itu sendiri
         composable(
             route = Screen.CreateOrder.route,
             enterTransition = {
@@ -117,3 +161,38 @@ fun AppNavigation() {
         }
     }
 }
+fun NavGraphBuilder.driverRegistrationGraph(navController: NavController) {
+    navigation(startDestination = Screen.RegisterDriverStep1.route, route = Screen.RegisterDriverGraph.route) {
+        composable(Screen.RegisterDriverStep1.route) {
+            val viewModel = it.sharedViewModel<RegisterDriverViewModel>(navController)
+            RegisterDriverStep1Screen(navController = navController, viewModel = viewModel)
+        }
+        composable(Screen.RegisterDriverStep2.route) {
+            val viewModel = it.sharedViewModel<RegisterDriverViewModel>(navController)
+            RegisterDriverStep2Screen(navController = navController, viewModel = viewModel)
+        }
+        composable(Screen.RegisterDriverStep3.route) {
+            val viewModel = it.sharedViewModel<RegisterDriverViewModel>(navController)
+            RegisterDriverStep3Screen(navController = navController, viewModel = viewModel)
+        }
+    }
+}
+
+// Fungsi helper untuk berbagi ViewModel di dalam nested graph
+@Composable
+inline fun <reified T : ViewModel> androidx.navigation.NavBackStackEntry.sharedViewModel(
+    navController: NavController,
+): T {
+    val navGraphRoute = destination.parent?.route ?: return viewModel()
+    val parentEntry = remember(this) {
+        navController.getBackStackEntry(navGraphRoute)
+    }
+    return viewModel(parentEntry)
+}
+
+
+
+
+
+
+

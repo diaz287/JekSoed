@@ -5,55 +5,36 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.*
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.jeksoed.R // Pastikan import R ini benar
+import androidx.navigation.compose.rememberNavController
+import com.example.jeksoed.R
 import com.example.jeksoed.navigation.Screen
-import com.example.jeksoed.ui.screens.passenger.components.BannerSlider
 import com.example.jeksoed.ui.screens.passenger.components.CategoryGrid
 import com.example.jeksoed.ui.screens.passenger.components.RecentHistoryList
 import com.example.jeksoed.ui.screens.passenger.components.RecommendationSection
 import com.example.jeksoed.ui.screens.passenger.components.TopHeader
 import com.example.jeksoed.ui.theme.JekSoedTheme
-import kotlinx.coroutines.delay
 
-// --- Data class untuk mock data (data palsu) ---
+// Data class bisa tetap ada
 data class Category(val name: String, val iconResId: Int, val tag: String? = null)
 data class HistoryItem(val title: String, val address: String)
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     navController: NavController,
@@ -63,144 +44,105 @@ fun HomeScreen(
     val hasNotification by remember { mutableStateOf(true) }
     val userName = "Rafi Purnama"
 
-    // --- PENGATURAN UNTUK SCROLLING EFFECT ---
-    val bannerHeight = 240.dp // Tinggi banner yang terlihat di awal
-    val topHeaderHeight = 100.dp // Perkiraan tinggi TopHeader + paddingnya
-
-    // Konversi Dp ke Px untuk perhitungan
-    val bannerHeightPx = with(LocalDensity.current) { bannerHeight.toPx() }
-    val topHeaderHeightPx = with(LocalDensity.current) { topHeaderHeight.toPx() }
-
-    // State untuk melacak seberapa jauh header telah "terlipat" (collapsed)
-    // Nilainya akan bergerak dari 0 (terbuka penuh) hingga maxOffsetPx (terlipat penuh)
-    val collapsedOffsetPx = remember { mutableStateOf(0f) }
-    val maxOffsetPx = bannerHeightPx - topHeaderHeightPx
-
-    // Objek yang akan menangani logika "mencuri" scroll
-    val nestedScrollConnection = remember {
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                val delta = available.y
-                val newOffset = collapsedOffsetPx.value + delta
-                // Batasi pergerakan offset antara 0 dan nilai maksimumnya
-                collapsedOffsetPx.value = newOffset.coerceIn(0f, maxOffsetPx)
-
-                // Kembalikan seberapa banyak scroll yang kita "curi"
-                return Offset.Zero
-            }
-        }
-    }
-
-    // --- STRUKTUR LAYOUT BARU ---
+    // --- MENGGUNAKAN BOX UNTUK MENUMPUK SEMUA KOMPONEN ---
     Box(
         modifier = Modifier
             .fillMaxSize()
-            // Terapkan nested scroll di container utama
-            .nestedScroll(nestedScrollConnection)
+            .background(Color(0xFFFFFBEB)) // Latar belakang kuning muda
     ) {
-        // 1. BANNER (di lapisan paling bawah)
-        // Offset vertikalnya dikontrol oleh state scroll
-        BannerSlider(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(300.dp) // Tinggi asli banner tetap
-                .graphicsLayer {
-                    // Efek parallax: banner bergerak lebih lambat dari scroll
-                    translationY = -collapsedOffsetPx.value * 0.5f
-                }
-        )
-
-        // 2. KONTEN UTAMA (LazyColumn di dalam Surface)
-        // Surface ini adalah "Card" putih yang akan bergerak
-        Surface(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    // Pergerakan utama dari card putih
-                    translationY = bannerHeightPx - collapsedOffsetPx.value
-                },
-            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-            color = MaterialTheme.colorScheme.surface
+        // LazyColumn sekarang menjadi lapisan dasar untuk semua konten
+        LazyColumn(
+            modifier = Modifier.fillMaxSize()
         ) {
-            LazyColumn(
-                contentPadding = PaddingValues(top = 16.dp) // Padding atas untuk konten
-            ) {
-                // SearchBar
-                item {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        SearchBarFake(onSearchClick)
-                        Spacer(modifier = Modifier.height(24.dp))
-                    }
+            // Item 1: Gambar Banner dan SearchBar
+            item {
+                TopHeader(
+                    name = userName,
+                    hasNotification = hasNotification,
+                    onNotificationClick = { /* TODO: Logika klik notifikasi */ }
+                )
+            }
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(240.dp) // Sesuaikan tinggi sesuai kebutuhan
+                ) {
+                    // Gambar statis sebagai latar belakang
+                    Image(
+                        painter = painterResource(id = R.drawable.home_bg),
+                        contentDescription = "Home Banner",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    // SearchBar ditumpuk di bagian bawah-tengah Box ini
+                    SearchBarFake(
+                        onSearchClick,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .offset(y = 54.dp) // Offset agar setengah tumpang tindih
+                    )
                 }
-                // Kategori
-                item {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        Text("Kategori", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.height(40.dp))
-                        CategoryGrid(onCategoryClick = { categoryName ->
-                            when (categoryName) {
-                                "JekMotor" -> {
-                                    navController.navigate(Screen.CreateOrder.route)
-                                }
-                                "JekClean", "Lainnya", "JekMobil" -> {
-                                    showDialog = true
-                                }
-                            }
-                        })
-                        Spacer(modifier = Modifier.height(24.dp))
-                    }
-                }
-                // Baru baru ini
-                item {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        Text("Baru baru ini...", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        RecentHistoryList()
-                        Spacer(modifier = Modifier.height(24.dp))
-                    }
-                }
-                // Rekomendasi
-                item {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        Text("Cucu Jendral belum pernah kesini? Rugi dong!", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        RecommendationSection()
-                    }
+            }
 
+            // Item 2: Spacer untuk memberi ruang setelah SearchBar
+            item {
+                Spacer(modifier = Modifier.height(70.dp))
+            }
+
+            // Item 3: Kategori
+            item {
+                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    Text("Kategori", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(40.dp))
+                    CategoryGrid(onCategoryClick = { categoryName ->
+                        when (categoryName) {
+                            "JekMotor" -> navController.navigate(Screen.CreateOrder.route)
+                            "JekClean", "Lainnya", "JekMobil" -> showDialog = true
+                        }
+                    })
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
+            }
+
+            // Item 4: Baru baru ini
+            item {
+                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    Text("Baru baru ini...", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    RecentHistoryList()
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
+            }
+
+            // Item 5: Rekomendasi
+            item {
+                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    Text("Cucu Jendral belum pernah kesini? Rugi dong!", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    RecommendationSection()
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
             }
         }
 
-        // 3. TOP HEADER (di lapisan paling atas)
-        // Background-nya akan berubah dari transparan menjadi putih
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.surface.copy(
-                // Alpha (transparansi) dihitung berdasarkan progres scroll
-                alpha = (collapsedOffsetPx.value / maxOffsetPx).coerceIn(0f, 1f)
-            ),
-            shadowElevation = 4.dp // Beri sedikit bayangan saat background putih muncul
-        ) {
-            TopHeader(
-                name = userName,
-                hasNotification = hasNotification,
-                onNotificationClick = { /* TODO: Logika klik notifikasi */ }
-            )
-        }
     }
 
     if (showDialog) {
         DevelopmentDialog(onDismiss = { showDialog = false })
     }
 }
+
+
+// SearchBarFake diubah sedikit untuk menerima Modifier
 @Composable
-fun SearchBarFake(onSearchClick: () -> Unit) {
+fun SearchBarFake(onSearchClick: () -> Unit, modifier: Modifier = Modifier) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onSearchClick() },
+        modifier = modifier.clickable { onSearchClick() },
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        shape = RoundedCornerShape(50), // Membuat lebih melengkung
+        shape = RoundedCornerShape(50),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Row(
@@ -210,7 +152,6 @@ fun SearchBarFake(onSearchClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-
             Text(
                 text = "Mau ke mana hari ini?",
                 color = Color.Gray,
@@ -221,12 +162,11 @@ fun SearchBarFake(onSearchClick: () -> Unit) {
                 contentDescription = "Cari",
                 tint = Color.Gray
             )
-
         }
     }
 }
 
-
+// DevelopmentDialog tidak berubah
 @Composable
 fun DevelopmentDialog(onDismiss: () -> Unit) {
     AlertDialog(
@@ -241,14 +181,14 @@ fun DevelopmentDialog(onDismiss: () -> Unit) {
     )
 }
 
-
+// Preview diperbarui
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 fun HomeScreenPreview() {
     JekSoedTheme {
         HomeScreen(
             onSearchClick = {},
-            navController = NavController(LocalContext.current)
+            navController = rememberNavController()
         )
     }
 }

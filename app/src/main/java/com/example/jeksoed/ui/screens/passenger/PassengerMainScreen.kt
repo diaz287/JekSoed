@@ -1,14 +1,26 @@
 package com.example.jeksoed.ui.screens.passenger
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -49,29 +61,66 @@ fun PassengerMainScreen(mainNavController: NavController) {
 fun BottomNavigationBar(navController: NavHostController) {
     val items = listOf(
         BottomNavItem("Home", "home", painterResource(id = R.drawable.home_icon)),
-        BottomNavItem("Activity", "activity", painterResource(id = R.drawable.maps_icon)),
+        BottomNavItem("Activity", "activity", painterResource(id = R.drawable.history_icon)),
         BottomNavItem("Profil", "profil", painterResource(id = R.drawable.profil_icon))
     )
 
-    NavigationBar {
+    NavigationBar(
+        // Atur warna latar belakang NavigationBar
+        containerColor = Color(0xFFFFF9D9) // Kuning sangat muda
+    ) {
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentRoute = navBackStackEntry?.destination?.route
 
         items.forEach { item ->
+            val isSelected = currentRoute == item.route
+
             NavigationBarItem(
-                icon = { Icon(item.icon, contentDescription = item.title, modifier = Modifier.size(24.dp)) },
-                label = { Text(item.title) },
-                selected = currentRoute == item.route,
+                selected = isSelected,
                 onClick = {
                     navController.navigate(item.route) {
                         popUpTo(navController.graph.startDestinationId)
                         launchSingleTop = true
                     }
-                }
+                },
+                // --- Kustomisasi Warna ---
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = colorResource(id = R.color.unsoed_dark),
+                    selectedTextColor = colorResource(id = R.color.unsoed_dark),
+                    unselectedIconColor = Color.Black,
+                    unselectedTextColor = Color.Black,
+                    indicatorColor = Color.Transparent // Sembunyikan indikator default
+                ),
+                // --- Kustomisasi Ikon dengan Indikator Garis di Atas ---
+                icon = {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        // Tampilkan Box sebagai indikator hanya jika item terpilih
+                        if (isSelected) {
+                            Box(
+                                modifier = Modifier
+                                    .width(80.dp)
+                                    .height(4.dp)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(colorResource(id = R.color.unsoed_dark))
+                            )
+                        } else {
+                            // Beri ruang kosong agar layout tidak bergeser
+                            Spacer(modifier = Modifier.height(4.dp))
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp)) // Jarak antara indikator dan ikon
+                        Icon(item.icon, contentDescription = item.title, modifier = Modifier.size(24.dp))
+                    }
+                },
+                label = { Text(item.title) }
             )
         }
     }
 }
+
 
 @Composable
 fun BottomNavGraph(mainNavController: NavController, bottomNavController: NavHostController) {

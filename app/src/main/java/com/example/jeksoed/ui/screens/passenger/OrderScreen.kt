@@ -229,14 +229,14 @@ private fun OrderScreenLayout(
         sheetShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
         sheetContent = sheetContent
     ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding).then( // Gunakan .then untuk menambahkan modifier secara kondisional
-            if (uiState.stage == OrderStage.FINDING_DRIVER)
-                Modifier.blur(radius = 8.dp)
-            else
-                Modifier
-        )) {
+        Box(modifier = Modifier.fillMaxSize().padding(padding)
+        ) {
             GoogleMap(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().then( // Gunakan .then untuk menambahkan modifier secara kondisional
+                    if (uiState.stage == OrderStage.FINDING_DRIVER)
+                        Modifier.blur(radius = 8.dp)
+                    else
+                        Modifier),
                 cameraPositionState = cameraPositionState,
                 uiSettings = MapUiSettings(zoomControlsEnabled = false)
             ) {
