@@ -13,6 +13,8 @@ import com.google.android.libraries.places.api.model.Place
 import com.google.android.libraries.places.api.net.FetchPlaceRequest
 import com.google.android.libraries.places.api.net.FindAutocompletePredictionsRequest
 import com.google.android.libraries.places.api.net.PlacesClient
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import com.google.maps.DirectionsApi
 import com.google.maps.GeoApiContext
 import com.google.maps.android.PolyUtil
@@ -24,6 +26,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import com.google.firebase.firestore.ListenerRegistration
 
 // --- DATA CLASS BARU ---
 data class SavedPlace(
@@ -200,7 +203,47 @@ class OrderViewModel : ViewModel() {
     }
 
     fun createOrder() {
-        // TODO: Implementasikan logika pembuatan order ke Firebase di sini
+            val user = FirebaseAuth.getInstance().currentUser
+            val pickup = _uiState.value.pickupLocation
+            val destination = _uiState.value.destinationLocation
+            val route = _uiState.value.routeInfo
+
+            if (user == null || pickup == null || destination == null || route == null) {
+                Log.e("OrderViewModel", "Data order belum lengkap!")
+                return
+            }
+
+            viewModelScope.launch {
+                try {
+                    val firestore = FirebaseFirestore.getInstance()
+
+                    val orderData = mapOf(
+                        "passengerId" to user.uid,
+                        "pickupName" to _uiState.value.pickupQuery,
+                        "pickupAddress" to _uiState.value.pickupAddress,
+                        "pickupLat" to pickup.latitude,
+                        "pickupLng" to pickup.longitude,
+                        "destinationName" to _uiState.value.destinationQuery,
+                        "destinationAddress" to "", // optional
+                        "destinationLat" to destination.latitude,
+                        "destinationLng" to destination.longitude,
+                        "distance" to route.distance,
+                        "duration" to route.duration,
+                        "price" to route.price,
+                        "status" to "pending",
+                        "createdAt" to com.google.firebase.Timestamp.now()
+                    )
+
+                    firestore.collection("ride_requests").add(orderData).await()
+                    Log.d("OrderViewModel", "Pesanan berhasil dibuat!")
+
+                    // ubah stage jadi mencari driver
+                    _uiState.update { it.copy(stage = OrderStage.FINDING_DRIVER) }
+
+                } catch (e: Exception) {
+                    Log.e("OrderViewModel", "Gagal membuat order", e)
+                }
+            }
         Log.d("OrderViewModel", "createOrder() dipanggil! Mengubah stage ke FINDING_DRIVER.")
         // --- UBAH STAGE KE MENCARI DRIVER ---
         _uiState.update { it.copy(stage = OrderStage.FINDING_DRIVER) }
@@ -210,4 +253,49 @@ class OrderViewModel : ViewModel() {
         // Kembali ke tahap sebelumnya (konfirmasi rute)
         _uiState.update { it.copy(stage = OrderStage.ROUTE_CONFIRM) }
     }
+
+    private var activeRideListener: ListenerRegistration? = null
+
+    fun listenToActiveRide(navToTrip: (String) -> Unit) {
+        val user = FirebaseAuth.getInstance().currentUser ?: return
+        val firestore = FirebaseFirestore.getInstance()
+
+        // Bersihkan listener lama kalau ada
+        activeRideListener?.remove()
+
+        activeRideListener = firestore.collection("ride_requests")
+            .whereEqualTo("passengerId", user.uid)
+            .whereIn("status", listOf("pending", "accepted"))
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    Log.e("OrderViewModel", "Gagal memantau ride aktif", e)
+                    return@addSnapshotListener
+                }
+
+                val ride = snapshot?.documents?.firstOrNull()
+                if (ride != null) {
+                    val rideId = ride.id
+                    val status = ride.getString("status")
+
+                    when (status) {
+                        "pending" -> {
+                            // masih nunggu driver → tetap di FindingDriverStage
+                            _uiState.update { it.copy(stage = OrderStage.FINDING_DRIVER) }
+                        }
+                        "accepted" -> {
+                            // driver sudah menerima → pindah ke TripScreen
+                            Log.d("OrderViewModel", "Orderan diterima: $rideId")
+                            navToTrip(rideId)
+                            activeRideListener?.remove() // hentikan listener
+                        }
+                    }
+                }
+            }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        activeRideListener?.remove()
+    }
+
 }

@@ -162,6 +162,14 @@ fun OrderScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        orderViewModel.listenToActiveRide { rideId ->
+            navController.navigate("trip/$rideId") {
+                popUpTo("order") { inclusive = true }
+            }
+        }
+    }
+
     // Memanggil Dumb Composable untuk menampilkan UI
     OrderScreenLayout(
         uiState = uiState,
