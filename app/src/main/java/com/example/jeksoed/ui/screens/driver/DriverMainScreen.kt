@@ -1,16 +1,7 @@
-package com.example.jeksoed.ui.screens.passenger
+package com.example.jeksoed.ui.screens.driver
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -31,25 +22,23 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.jeksoed.R
-import com.example.jeksoed.navigation.Screen
 import com.example.jeksoed.ui.theme.JekSoedTheme
 
-// Data class untuk item di bottom bar (tidak perlu diubah)
-data class BottomNavItem(
+// Data class untuk item di bottom bar
+data class DriverBottomNavItem(
     val title: String,
     val route: String,
     val icon: Painter
 )
 
 @Composable
-fun PassengerMainScreen(mainNavController: NavController) {
+fun DriverMainScreen(mainNavController: NavController) {
     val bottomNavController = rememberNavController()
     Scaffold(
-        bottomBar = { BottomNavigationBar(navController = bottomNavController) }
+        bottomBar = { DriverBottomNavigationBar(navController = bottomNavController) }
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
-            // Navigasi internal untuk konten bottom bar
-            BottomNavGraph(
+            DriverBottomNavGraph(
                 mainNavController = mainNavController,
                 bottomNavController = bottomNavController
             )
@@ -58,11 +47,11 @@ fun PassengerMainScreen(mainNavController: NavController) {
 }
 
 @Composable
-fun BottomNavigationBar(navController: NavHostController) {
+fun DriverBottomNavigationBar(navController: NavHostController) {
     val items = listOf(
-        BottomNavItem("Home", "home", painterResource(id = R.drawable.home_icon)),
-        BottomNavItem("Activity", "activity", painterResource(id = R.drawable.maps_icon)),
-        BottomNavItem("Profil", "profil", painterResource(id = R.drawable.profil_icon))
+        DriverBottomNavItem("Home", "driver_home", painterResource(id = R.drawable.home_icon)),
+        DriverBottomNavItem("Activity", "driver_activity", painterResource(id = R.drawable.maps_icon)),
+        DriverBottomNavItem("Profil", "driver_profil", painterResource(id = R.drawable.profil_icon))
     )
 
     NavigationBar(
@@ -123,46 +112,31 @@ fun BottomNavigationBar(navController: NavHostController) {
 
 
 @Composable
-fun BottomNavGraph(mainNavController: NavController, bottomNavController: NavHostController) {
-    NavHost(navController = bottomNavController, startDestination = "home") {
-        composable("home") {
-            // --- PERUBAHAN 1 ---
-            // Teruskan navController utama ke HomeScreen
-            HomeScreen(
-                navController = mainNavController,
-                onSearchClick = {
-                    mainNavController.navigate(Screen.CreateOrder.route)
-                }
-            )
+fun DriverBottomNavGraph(mainNavController: NavController, bottomNavController: NavHostController) {
+    NavHost(navController = bottomNavController, startDestination = "driver_home") {
+        composable("driver_home") {
+            // Kita akan ganti isinya dengan desain baru
+            DriverHomeScreen(navController = mainNavController)
         }
-        composable("activity") { ActivityScreen() }
-
-        // --- PERUBAHAN 2 ---
-        // Panggil ProfileScreen yang benar dan teruskan navController utama
-        composable("profil") {
-            ProfileScreen(navController = mainNavController)
+        composable("driver_activity") {
+            // Placeholder untuk halaman riwayat
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Halaman Riwayat Orderan")
+            }
+        }
+        composable("driver_profil") {
+            // Placeholder untuk halaman profil
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Halaman Profil Driver")
+            }
         }
     }
 }
-
-// --- Halaman Placeholder untuk Riwayat ---
-// Hapus ProfilScreen placeholder karena kita sudah punya implementasi aslinya
-
-@Composable
-fun ActivityScreen() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = androidx.compose.ui.Alignment.Center
-    ) {
-        Text("Halaman Riwayat Perjalanan")
-    }
-}
-
 
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
-fun PassengerMainScreenPreview() {
+fun DriverMainScreenPreview() {
     JekSoedTheme {
-        PassengerMainScreen(mainNavController = rememberNavController())
+        DriverMainScreen(mainNavController = rememberNavController())
     }
 }

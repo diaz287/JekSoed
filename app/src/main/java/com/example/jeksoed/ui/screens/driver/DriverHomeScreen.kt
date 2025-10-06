@@ -1,166 +1,275 @@
 package com.example.jeksoed.ui.screens.driver
 
-import android.widget.Toast
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.jeksoed.data.model.RideRequest
-import com.example.jeksoed.navigation.Screen
+import androidx.navigation.compose.rememberNavController
+import com.example.jeksoed.R
 import com.example.jeksoed.ui.theme.JekSoedTheme
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.rememberCameraPositionState
 
-/**
- * SMART COMPOSABLE (SCREEN-LEVEL)
- * - Membuat ViewModel.
- * - Mengumpulkan state dari ViewModel.
- * - Menangani navigasi.
- * - Meneruskan state dan event handler ke UI "bodoh".
- */
 @Composable
-fun DriverHomeScreen(
-    navController: NavController,
-    viewModel: DriverHomeViewModel = viewModel()
-) {
-    val uiState by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
+fun DriverHomeScreen(navController: NavController) {
+    var isOnline by remember { mutableStateOf(true) }
+    var showOfflineDialog by remember { mutableStateOf(false) }
 
-    DriverHomeScreenUI(
-        uiState = uiState,
-        onAcceptRide = { rideId ->
-            viewModel.acceptRide(
-                rideId = rideId,
-                onSuccess = {
-                    Toast.makeText(context, "Orderan berhasil diambil!", Toast.LENGTH_SHORT).show()
-                    navController.navigate(Screen.Trip.createRoute(rideId))
-                },
-                onFailure = { e ->
-                    Toast.makeText(context, "Gagal mengambil orderan: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
-            )
-        },
-        onLogoutClick = {
-            viewModel.logout()
-            navController.navigate(Screen.Login.route) {
-                popUpTo(Screen.DriverHome.route) { inclusive = true }
+    val unsoedLocation = LatLng(-7.431, 109.245)
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(unsoedLocation, 15f)
+    }
+
+    if (showOfflineDialog) {
+        OfflineConfirmationDialog(
+            onDismiss = { showOfflineDialog = false },
+            onConfirm = {
+                isOnline = false
+                showOfflineDialog = false
             }
+        )
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Peta di latar belakang
+        GoogleMap(
+            modifier = Modifier.fillMaxSize(),
+            cameraPositionState = cameraPositionState,
+            uiSettings = com.google.maps.android.compose.MapUiSettings(zoomControlsEnabled = false)
+        ) {
+            Marker(
+                state = MarkerState(position = unsoedLocation),
+                title = "Lokasi Anda"
+            )
         }
-    )
+
+        // Kontrol di bagian atas (Status & Notifikasi)
+        TopControls(
+            isOnline = isOnline,
+            onNotificationClick = { /*TODO*/ },
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp)
+        )
+
+        // Kartu Informasi Driver di bagian bawah
+        DriverInfoCard(
+            modifier = Modifier
+                .align(Alignment.BottomCenter),
+            onToggleStatus = {
+                if (isOnline) {
+                    showOfflineDialog = true
+                } else {
+                    isOnline = true
+                }
+            },
+            isOnline = isOnline
+        )
+    }
 }
 
-/**
- * DUMB UI COMPOSABLE
- * - Sepenuhnya dikontrol dari luar.
- * - Tidak memiliki state internal atau logika bisnis.
- * - Mudah di-preview.
- */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DriverHomeScreenUI(
-    uiState: DriverHomeUiState,
-    onAcceptRide: (rideId: String) -> Unit,
-    onLogoutClick: () -> Unit
+private fun TopControls(
+    isOnline: Boolean,
+    onNotificationClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Orderan Tersedia") },
-                actions = { Button(onClick = onLogoutClick) { Text("Logout") } }
-            )
-        }
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier.fillMaxSize().padding(paddingValues),
-            contentAlignment = Alignment.Center
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Button(
+            onClick = { },
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFC107)),
+            shape = RoundedCornerShape(50)
         ) {
-            if (uiState.isLoading) {
-                CircularProgressIndicator()
-            } else if (uiState.rideRequests.isEmpty()) {
-                Text("Belum ada orderan tersedia.")
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(uiState.rideRequests) { request ->
-                        RideRequestCard(
-                            rideRequest = request,
-                            isAccepting = (uiState.acceptingRideId == request.id),
-                            onAcceptClick = { onAcceptRide(request.id) }
-                        )
-                    }
-                }
-            }
+            Text(if (isOnline) "Kamu Online" else "Kamu Offline", color = Color.Black, fontWeight = FontWeight.Bold)
+        }
+        IconButton(
+            onClick = onNotificationClick,
+            modifier = Modifier
+                .clip(CircleShape)
+                .background(Color.White)
+        ) {
+            Icon(Icons.Default.Notifications, contentDescription = "Notifikasi")
         }
     }
 }
 
-/**
- * DUMB COMPONENT CARD
- * - Hanya menampilkan data satu orderan.
- */
 @Composable
-fun RideRequestCard(
-    rideRequest: RideRequest,
-    isAccepting: Boolean,
-    onAcceptClick: () -> Unit
+private fun DriverInfoCard(
+    modifier: Modifier = Modifier,
+    isOnline: Boolean,
+    onToggleStatus: () -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Orderan Baru", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(8.dp))
+            // Baris Profil & Tombol Power
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Jarak: ${rideRequest.distance}")
-                Text("Waktu: ${rideRequest.duration}")
+                Image(
+                    painter = painterResource(id = R.drawable.person_icon),
+                    contentDescription = "Foto Profil",
+                    modifier = Modifier
+                        .size(50.dp)
+                        .clip(CircleShape)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Fajar Nugros", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text("R 6666 CA", color = Color.Gray, fontSize = 14.sp)
+                }
+                IconButton(onClick = onToggleStatus) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.power_icon), // Pastikan ada drawable power_icon
+                        contentDescription = "Toggle Status",
+                        tint = if(isOnline) Color(0xFFFFC107) else Color.Gray,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
             }
             Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = onAcceptClick,
+            // Kartu Detail (Balance, Rating, Orderan)
+            Card(
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !isAccepting
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF272343))
             ) {
-                if (isAccepting) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
-                } else {
-                    Text("Ambil Orderan")
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceAround
+                ) {
+                    InfoItem("Balance", "Rp150.000,-")
+                    InfoItem("Rating", "4.8")
+                    InfoItem("Orderan", "5")
                 }
             }
         }
     }
 }
 
-@Preview(showBackground = true)
+@Composable
+private fun InfoItem(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, color = Color.Gray, fontSize = 12.sp)
+        Spacer(modifier = Modifier.height(4.dp))
+        if (label == "Rating") {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFC107), modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(value, color = Color.White, fontWeight = FontWeight.SemiBold)
+            }
+        } else {
+            Text(value, color = Color.White, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun OfflineConfirmationDialog(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(24.dp),
+        icon = {
+            Image(
+                painter = painterResource(id = R.drawable.motor_icon), // Ganti dengan logo Jeksoed
+                contentDescription = "Logo",
+                modifier = Modifier.size(40.dp)
+            )
+        },
+        title = { Text("Kamu mau offline?", fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
+        text = {
+            Text(
+                "Mau istirahat dulu ya? 😴\nKalau offline, kamu gak bakal dapet order dulu.",
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+                lineHeight = 20.sp
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFC107)),
+                shape = RoundedCornerShape(50)
+            ) {
+                Text("Offline dulu", color = Color.Black)
+            }
+        },
+        dismissButton = {
+            OutlinedButton(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(50),
+                border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp)
+            ) {
+                Text("Tetap Online", color = Color.Black)
+            }
+        }
+    )
+}
+@Preview(showBackground = true, showSystemUi = true, name = "Halaman Home Driver")
 @Composable
 private fun DriverHomeScreenPreview() {
-    val dummyRequests = listOf(
-        RideRequest(id = "1", distance = "5.2 km", duration = "15 min"),
-        RideRequest(id = "2", distance = "3.1 km", duration = "8 min"),
-    )
-    val dummyUiState = DriverHomeUiState(
-        rideRequests = dummyRequests,
-        isLoading = false,
-        acceptingRideId = "2" // Contoh jika orderan kedua sedang di-accept
-    )
     JekSoedTheme {
-        DriverHomeScreenUI(
-            uiState = dummyUiState,
-            onAcceptRide = {},
-            onLogoutClick = {}
-        )
+        DriverHomeScreen(navController = rememberNavController())
+    }
+}
+
+@Preview(name = "Info Card (Online)")
+@Composable
+private fun DriverInfoCardOnlinePreview() {
+    JekSoedTheme {
+        DriverInfoCard(isOnline = true, onToggleStatus = {})
+    }
+}
+@Preview(name = "Info Card (Offline)")
+@Composable
+private fun DriverInfoCardOfflinePreview() {
+    JekSoedTheme {
+        DriverInfoCard(isOnline = false, onToggleStatus = {})
+    }
+}
+
+@Preview(name = "Dialog Konfirmasi Offline")
+@Composable
+private fun OfflineConfirmationDialogPreview() {
+    JekSoedTheme {
+        OfflineConfirmationDialog(onDismiss = {}, onConfirm = {})
     }
 }

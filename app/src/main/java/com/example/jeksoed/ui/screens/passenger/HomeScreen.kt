@@ -14,7 +14,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -44,90 +43,84 @@ fun HomeScreen(
     val hasNotification by remember { mutableStateOf(true) }
     val userName = "Rafi Purnama"
 
-    // --- MENGGUNAKAN BOX UNTUK MENUMPUK SEMUA KOMPONEN ---
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFFFFBEB)) // Latar belakang kuning muda
     ) {
-        // LazyColumn sekarang menjadi lapisan dasar untuk semua konten
         LazyColumn(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(20.dp) // Tarik item berikutnya ke atas
         ) {
-            // Item 1: Gambar Banner dan SearchBar
+            // Item 1: Header dan Banner digabung
             item {
-                TopHeader(
-                    name = userName,
-                    hasNotification = hasNotification,
-                    onNotificationClick = { /* TODO: Logika klik notifikasi */ }
-                )
-            }
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(240.dp) // Sesuaikan tinggi sesuai kebutuhan
-                ) {
-                    // Gambar statis sebagai latar belakang
+                Column {
+                    TopHeader(
+                        name = userName,
+                        hasNotification = hasNotification,
+                        onNotificationClick = { /* TODO: Logika klik notifikasi */ }
+                    )
                     Image(
                         painter = painterResource(id = R.drawable.home_bg),
                         contentDescription = "Home Banner",
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                    // SearchBar ditumpuk di bagian bawah-tengah Box ini
-                    SearchBarFake(
-                        onSearchClick,
                         modifier = Modifier
-                            .align(Alignment.BottomCenter)
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                            .offset(y = 54.dp) // Offset agar setengah tumpang tindih
+                            .height(200.dp) // Tinggi banner dikurangi tinggi overlap
                     )
                 }
             }
 
-            // Item 2: Spacer untuk memberi ruang setelah SearchBar
+            // --- PERUBAHAN DI SINI ---
+            // Item 2: Card yang berisi SearchBar dan semua konten lainnya
             item {
-                Spacer(modifier = Modifier.height(70.dp))
-            }
+                Card(
+                    modifier = Modifier.fillParentMaxSize(),
+                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column {
+                        // SearchBar sekarang ada di dalam Card
+                        SearchBarFake(
+                            onSearchClick,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 16.dp)
+                        )
 
-            // Item 3: Kategori
-            item {
-                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    Text("Kategori", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(40.dp))
-                    CategoryGrid(onCategoryClick = { categoryName ->
-                        when (categoryName) {
-                            "JekMotor" -> navController.navigate(Screen.CreateOrder.route)
-                            "JekClean", "Lainnya", "JekMobil" -> showDialog = true
+                        // Kategori
+                        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            Text("Kategori", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(40.dp))
+                            CategoryGrid(onCategoryClick = { categoryName ->
+                                when (categoryName) {
+                                    "JekMotor" -> navController.navigate(Screen.CreateOrder.route)
+                                    "JekClean", "Lainnya", "JekMobil" -> showDialog = true
+                                }
+                            })
+                            Spacer(modifier = Modifier.height(24.dp))
                         }
-                    })
-                    Spacer(modifier = Modifier.height(24.dp))
-                }
-            }
 
-            // Item 4: Baru baru ini
-            item {
-                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    Text("Baru baru ini...", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    RecentHistoryList()
-                    Spacer(modifier = Modifier.height(24.dp))
-                }
-            }
+                        // Baru baru ini
+                        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            Text("Baru baru ini...", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(12.dp))
+                            RecentHistoryList()
+                            Spacer(modifier = Modifier.height(24.dp))
+                        }
 
-            // Item 5: Rekomendasi
-            item {
-                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    Text("Cucu Jendral belum pernah kesini? Rugi dong!", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    RecommendationSection()
-                    Spacer(modifier = Modifier.height(16.dp))
+                        // Rekomendasi
+                        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            Text("Cucu Jendral belum pernah kesini? Rugi dong!", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(12.dp))
+                            RecommendationSection()
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
+                    }
                 }
             }
         }
-
     }
 
     if (showDialog) {
@@ -148,7 +141,8 @@ fun SearchBarFake(onSearchClick: () -> Unit, modifier: Modifier = Modifier) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .height(54.dp) // Beri tinggi eksplisit
+                .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {

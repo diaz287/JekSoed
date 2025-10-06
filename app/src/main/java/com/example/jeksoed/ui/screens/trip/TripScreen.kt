@@ -53,7 +53,7 @@ fun TripScreen(
         viewModel.navEvent.collect { event ->
             when (event) {
                 is TripNavEvent.NavigateToDriverHome -> {
-                    navController.navigate(Screen.DriverHome.route) {
+                    navController.navigate(Screen.DriverMain.route) {
                         // Hapus semua histori navigasi agar driver tidak bisa kembali ke TripScreen
                         popUpTo(navController.graph.startDestinationId) { inclusive = true }
                     }

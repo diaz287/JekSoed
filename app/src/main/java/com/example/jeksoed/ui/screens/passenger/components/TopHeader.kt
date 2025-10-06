@@ -29,12 +29,12 @@ fun TopHeader(name: String, hasNotification: Boolean, onNotificationClick: () ->
     ) {
         Text(
             text = "Halo, $name!",
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             modifier = Modifier
                 .weight(1f)
                 .clip(RoundedCornerShape(50))
-                .background(Color.White)
+                .background(Color.Transparent)
                 .padding(horizontal = 12.dp, vertical = 8.dp)
         )
         Spacer(modifier = Modifier.width(16.dp))
@@ -42,7 +42,7 @@ fun TopHeader(name: String, hasNotification: Boolean, onNotificationClick: () ->
             modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape)
-                .background(Color.White)
+                .background(Color.Transparent)
                 .clickable { onNotificationClick() },
             contentAlignment = Alignment.Center
         ) {

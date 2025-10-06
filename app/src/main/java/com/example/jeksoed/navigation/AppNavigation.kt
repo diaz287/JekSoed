@@ -33,6 +33,7 @@ import com.example.jeksoed.ui.screens.auth.RegisterDriverStep1Screen
 import com.example.jeksoed.ui.screens.auth.RegisterDriverStep2Screen
 import com.example.jeksoed.ui.screens.auth.RegisterDriverStep3Screen
 import com.example.jeksoed.ui.screens.auth.RegisterDriverViewModel
+import com.example.jeksoed.ui.screens.driver.DriverMainScreen
 
 // Sealed class Screen tidak perlu diubah
 sealed class Screen(val route: String) {
@@ -51,7 +52,7 @@ sealed class Screen(val route: String) {
     object ForgotPassword : Screen("forgot_password")
     object PassengerMain : Screen("passenger_main")
     object CreateOrder : Screen("create_order")
-    object DriverHome : Screen("driver_home")
+    object DriverMain : Screen("driver_main")
     object FindingDriver : Screen("finding_driver/{rideRequestId}") {
         fun createRoute(rideRequestId: String) = "finding_driver/$rideRequestId"
     }
@@ -99,7 +100,9 @@ fun AppNavigation() {
         // --- BLOK YANG DIDUPLIKASI DAN SALAH SUDAH DIHAPUS ---
 
         composable(Screen.PassengerMain.route) { PassengerMainScreen(navController) }
-        composable(Screen.DriverHome.route) { DriverHomeScreen(navController) }
+        composable(Screen.DriverMain.route) {
+            DriverMainScreen(navController)
+        }
 
         composable(
             route = Screen.CreateOrder.route,
