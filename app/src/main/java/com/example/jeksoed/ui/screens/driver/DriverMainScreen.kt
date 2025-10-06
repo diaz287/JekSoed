@@ -23,6 +23,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.jeksoed.R
 import com.example.jeksoed.ui.screens.activity.ActivityScreen
+import com.example.jeksoed.ui.screens.passenger.ProfileScreen
 import com.example.jeksoed.ui.theme.JekSoedTheme
 
 // Data class untuk item di bottom bar
@@ -123,10 +124,7 @@ fun DriverBottomNavGraph(mainNavController: NavController, bottomNavController: 
             ActivityScreen(navController = mainNavController)
         }
         composable("driver_profil") {
-            // Placeholder untuk halaman profil
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Halaman Profil Driver")
-            }
+            ProfileScreen(navController = mainNavController)
         }
     }
 }

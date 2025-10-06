@@ -2,7 +2,11 @@
 
 package com.example.jeksoed.ui.screens.passenger
 
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -18,13 +22,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.example.jeksoed.R
 import com.example.jeksoed.ui.components.PrimaryButton
 import com.example.jeksoed.ui.theme.JekSoedTheme
@@ -37,6 +42,15 @@ fun EditProfileScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri: Uri? ->
+            uri?.let {
+                viewModel.uploadProfilePhoto(it)
+            }
+        }
+    )
 
     LaunchedEffect(uiState.successMessage) {
         uiState.successMessage?.let {
@@ -70,21 +84,48 @@ fun EditProfileScreen(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+
+            var showPhotoOptions by remember { mutableStateOf(false) }
             // Edit Foto
             Box(contentAlignment = Alignment.Center) {
-                Image(
-                    painter = painterResource(id = R.drawable.person_icon),
+                AsyncImage(
+                    model = uiState.photoUrl.ifBlank { R.drawable.person_icon },
                     contentDescription = "Foto Profil",
-                    modifier = Modifier.size(100.dp).clip(CircleShape)
-                )
-                Text(
-                    "Tap to edit",
-                    color = Color.White,
                     modifier = Modifier
-                        .clickable { /*TODO: Image Picker Logic*/ }
-                        .padding(4.dp)
+                        .size(100.dp)
+                        .clip(CircleShape)
+                        .clickable {
+                            // Buka bottom sheet sederhana
+                            showPhotoOptions = true
+                        },
+                    contentScale = ContentScale.Crop
                 )
             }
+
+            if (showPhotoOptions) {
+                AlertDialog(
+                    onDismissRequest = { showPhotoOptions = false },
+                    confirmButton = {},
+                    text = {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            TextButton(onClick = {
+                                showPhotoOptions = false
+                                imagePickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            }) {
+                                Text("Ganti Foto", color = Color.Black)
+                            }
+                            Divider()
+                            TextButton(onClick = {
+                                showPhotoOptions = false
+                                viewModel.deleteProfilePhoto()
+                            }) {
+                                Text("Hapus Foto", color = Color.Red)
+                            }
+                        }
+                    }
+                )
+            }
+
             Spacer(modifier = Modifier.height(32.dp))
 
             // Input Fields

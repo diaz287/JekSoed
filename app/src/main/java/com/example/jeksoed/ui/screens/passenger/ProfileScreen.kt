@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import coil.compose.AsyncImage
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -159,8 +160,8 @@ fun ProfileScreenUI(
                 }
 
                 // --- PERUBAHAN 2: FOTO DITARUH SETELAH CARD AGAR MENUMPUK DI ATAS ---
-                Image(
-                    painter = painterResource(id = R.drawable.person_icon),
+                AsyncImage(
+                    model = uiState.photoUrl.ifBlank { R.drawable.person_icon },
                     contentDescription = "Foto Profil",
                     modifier = Modifier
                         .size(profileImageSize)

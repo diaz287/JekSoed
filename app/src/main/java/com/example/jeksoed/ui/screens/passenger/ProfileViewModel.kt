@@ -14,6 +14,7 @@ import kotlinx.coroutines.tasks.await
 data class ProfileUiState(
     val name: String = "Memuat...",
     val email: String = "Memuat...",
+    val photoUrl: String = "",
     val isLoading: Boolean = true,
     val showLogoutDialog: Boolean = false, // State untuk dialog logout
     val showDeleteDialog: Boolean = false  // State untuk dialog hapus akun
@@ -42,6 +43,7 @@ class ProfileViewModel : ViewModel() {
                             it.copy(
                                 name = document.getString("nama") ?: "Nama tidak ditemukan",
                                 email = user.email ?: "Email tidak ditemukan",
+                                photoUrl = document.getString("photoUrl") ?: "",
                                 isLoading = false
                             )
                         }
@@ -51,6 +53,7 @@ class ProfileViewModel : ViewModel() {
                         it.copy(
                             name = "Gagal memuat data",
                             email = "Gagal memuat data",
+                            photoUrl = "",
                             isLoading = false
                         )
                     }

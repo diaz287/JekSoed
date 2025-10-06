@@ -41,7 +41,8 @@ import com.google.firebase.Timestamp
 @Composable
 fun ChatScreen(
     navController: NavController,
-    viewModel: ChatViewModel = viewModel()
+    viewModel: ChatViewModel = viewModel(),
+    rideRequestId: String
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()

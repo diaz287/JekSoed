@@ -20,7 +20,6 @@ import com.example.jeksoed.ui.screens.auth.RegisterPassengerScreen
 import com.example.jeksoed.ui.screens.auth.RoleSelectionScreen
 import com.example.jeksoed.ui.screens.auth.TncScreen
 import com.example.jeksoed.ui.screens.chat.ChatScreen
-import com.example.jeksoed.ui.screens.driver.DriverHomeScreen
 import com.example.jeksoed.ui.screens.passenger.FindingDriverScreen
 import com.example.jeksoed.ui.screens.passenger.OrderScreen
 import com.example.jeksoed.ui.screens.passenger.PassengerMainScreen
