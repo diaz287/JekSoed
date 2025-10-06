@@ -1,3 +1,4 @@
+
 package com.example.jeksoed.ui.screens.passenger
 
 import androidx.lifecycle.ViewModel
@@ -10,11 +11,12 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-// Data class untuk menampung state UI Profil
 data class ProfileUiState(
     val name: String = "Memuat...",
     val email: String = "Memuat...",
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    val showLogoutDialog: Boolean = false, // State untuk dialog logout
+    val showDeleteDialog: Boolean = false  // State untuk dialog hapus akun
 )
 
 class ProfileViewModel : ViewModel() {
@@ -57,7 +59,46 @@ class ProfileViewModel : ViewModel() {
         }
     }
 
-    fun logout() {
+    fun onLogoutClick() {
+        _uiState.update { it.copy(showLogoutDialog = true) }
+    }
+
+    fun onDismissLogoutDialog() {
+        _uiState.update { it.copy(showLogoutDialog = false) }
+    }
+
+    fun onDeleteClick() {
+        _uiState.update { it.copy(showDeleteDialog = true) }
+    }
+
+    fun onDismissDeleteDialog() {
+        _uiState.update { it.copy(showDeleteDialog = false) }
+    }
+
+
+    fun confirmLogout() {
         auth.signOut()
+        onDismissLogoutDialog() // Tutup dialog setelah logout
+    }
+
+    fun confirmDeleteAccount() {
+        // PERHATIAN: Ini adalah operasi berbahaya.
+        // Implementasi ini hanya contoh sederhana.
+        viewModelScope.launch {
+            try {
+                val user = auth.currentUser
+                val uid = user?.uid
+                if (uid != null) {
+                    // 1. Hapus data dari Firestore
+                    firestore.collection("users").document(uid).delete().await()
+                    // 2. Hapus user dari Auth
+                    user.delete().await()
+                }
+            } catch (e: Exception) {
+                // Handle error (misal: perlu re-autentikasi)
+            } finally {
+                onDismissDeleteDialog()
+            }
+        }
     }
 }

@@ -32,6 +32,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.jeksoed.R
 import com.example.jeksoed.navigation.Screen
+import com.example.jeksoed.ui.screens.activity.ActivityScreen
 import com.example.jeksoed.ui.theme.JekSoedTheme
 
 // Data class untuk item di bottom bar (tidak perlu diubah)
@@ -135,7 +136,9 @@ fun BottomNavGraph(mainNavController: NavController, bottomNavController: NavHos
                 }
             )
         }
-        composable("activity") { ActivityScreen() }
+        composable("activity") {
+            ActivityScreen(navController = mainNavController)
+        }
 
         // --- PERUBAHAN 2 ---
         // Panggil ProfileScreen yang benar dan teruskan navController utama

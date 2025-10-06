@@ -1,44 +1,51 @@
+// main/java/com/example/jeksoed/ui/screens/trip/TripScreen.kt
+
 package com.example.jeksoed.ui.screens.trip
 
-import android.util.Log
-import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.jeksoed.data.model.RideRequest
 import com.example.jeksoed.navigation.Screen
-import com.example.jeksoed.ui.screens.rating.RatingNavEvent
+import com.example.jeksoed.ui.screens.trip.components.TripDriverBottomSheet
 import com.example.jeksoed.ui.theme.JekSoedTheme
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
-import com.google.firebase.Timestamp
 import com.google.maps.android.PolyUtil
 import com.google.maps.android.compose.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import com.example.jeksoed.ui.screens.trip.components.PaymentConfirmationCard
+import com.example.jeksoed.ui.screens.trip.components.TripDriverBottomSheet
+import com.example.jeksoed.ui.screens.trip.components.TripPassengerSheet
+import com.example.jeksoed.utils.formatCurrency
 
-// Composable yang terhubung ke ViewModel
+// Composable "Pintar" yang terhubung ke ViewModel
 @Composable
 fun TripScreen(
     navController: NavController,
+    rideRequestId: String,
     viewModel: TripViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
 
-    // Logic khusus untuk Driver (start/stop location updates)
+    // Logic untuk update lokasi driver (tidak berubah)
     if (uiState.isDriver) {
         val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
         DisposableEffect(Unit) {
@@ -49,12 +56,12 @@ fun TripScreen(
         }
     }
 
+    // Logic untuk navigasi (tidak berubah)
     LaunchedEffect(Unit) {
         viewModel.navEvent.collect { event ->
             when (event) {
                 is TripNavEvent.NavigateToDriverHome -> {
                     navController.navigate(Screen.DriverMain.route) {
-                        // Hapus semua histori navigasi agar driver tidak bisa kembali ke TripScreen
                         popUpTo(navController.graph.startDestinationId) { inclusive = true }
                     }
                 }
@@ -67,36 +74,38 @@ fun TripScreen(
         }
     }
 
-    TripScreenContent(
+    // Panggil UI Composable yang baru
+    TripScreenLayout(
         uiState = uiState,
         cameraPositionState = rememberCameraPositionState(),
-        onUpdateStatus = { newStatus ->
-            viewModel.updateTripStatus(newStatus)
+        onUpdateStatus = viewModel::updateTripStatus,
+        onCancelTrip = viewModel::cancelTrip,
+        onFinishTrip = {
+            // Navigasi ke TripCompletedScreen saat pembayaran dikonfirmasi
+            navController.navigate(Screen.TripCompleted.createRoute(rideRequestId)) {
+                // Hapus TripScreen dari backstack agar tidak bisa kembali
+                popUpTo(Screen.Trip.route) { inclusive = true }
+            }
         },
         onChatClick = { rideId ->
             navController.navigate(Screen.Chat.createRoute(rideId))
         },
-        onLogoutClick = {
-            viewModel.logout()
-            navController.navigate(Screen.Login.route) {
-                popUpTo(navController.graph.startDestinationId) { inclusive = true }
-            }
-        }
+        onBackClick = { navController.popBackStack() }
     )
 }
 
-// Composable yang hanya bertugas menampilkan UI
-@OptIn(ExperimentalMaterial3Api::class)
+// Composable "Biasa" yang hanya menampilkan UI
 @Composable
-fun TripScreenContent(
+fun TripScreenLayout(
     uiState: TripUiState,
     cameraPositionState: CameraPositionState,
     onUpdateStatus: (String) -> Unit,
+    onCancelTrip: () -> Unit,
+    onFinishTrip: () -> Unit,
     onChatClick: (rideId: String) -> Unit,
-    onLogoutClick: () -> Unit
+    onBackClick: () -> Unit
 ) {
-
-    // Efek untuk menyesuaikan kamera
+    // Efek untuk menyesuaikan kamera (tidak berubah)
     LaunchedEffect(uiState.polylinePoints) {
         if (uiState.polylinePoints.isNotEmpty()) {
             val bounds = LatLngBounds.builder()
@@ -106,152 +115,116 @@ fun TripScreenContent(
             )
         }
     }
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Perjalanan Berlangsung",
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                },
-                actions = {
-                    IconButton(onClick = {
-                        uiState.rideRequest?.id?.let { rideId ->
-                            onChatClick(rideId)
-                        }
-                    }) {
-                        Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Chat")
-                    }
-                    Button(onClick = onLogoutClick) {
-                        Text("Logout")
-                    }
-                }
-            )
-        }
-    ) { paddingValues ->
 
-        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-            GoogleMap(
-                modifier = Modifier.fillMaxSize(),
-                cameraPositionState = cameraPositionState
-            ) {
-                if (uiState.polylinePoints.isNotEmpty()) {
-                    Polyline(points = uiState.polylinePoints, color = Color.Blue, width = 15f)
-                }
-
-                uiState.rideRequest?.let { request ->
-                    val pickupLatLng = LatLng(
-                        request.pickupLocation["latitude"] ?: 0.0,
-                        request.pickupLocation["longitude"] ?: 0.0
-                    )
-                    Marker(state = MarkerState(position = pickupLatLng), title = "Jemput")
-
-                    val destLatLng = LatLng(
-                        request.destinationLocation["latitude"] ?: 0.0,
-                        request.destinationLocation["longitude"] ?: 0.0
-                    )
-                    Marker(state = MarkerState(position = destLatLng), title = "Tujuan")
-
-                    request.driverCurrentLocation?.let {
-                        val driverLatLng = LatLng(it["latitude"] ?: 0.0, it["longitude"] ?: 0.0)
-                        Marker(
-                            state = MarkerState(position = driverLatLng),
-                            title = "Driver",
-                            icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
-                        )
-                    }
-                }
+    Box(modifier = Modifier.fillMaxSize()) {
+        // --- PETA SEBAGAI LATAR BELAKANG ---
+        GoogleMap(
+            modifier = Modifier.fillMaxSize(),
+            cameraPositionState = cameraPositionState
+        ) {
+            // Polyline, Marker Jemput, Tujuan, dan Driver (tidak berubah)
+            if (uiState.polylinePoints.isNotEmpty()) {
+                Polyline(points = uiState.polylinePoints, color = MaterialTheme.colorScheme.primary, width = 15f)
             }
 
-            Card(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Tampilkan status untuk kedua pengguna
-                    Text(
-                        text = "Status: ${uiState.rideRequest?.status?.replaceFirstChar { it.titlecase() } ?: "Memuat..."}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+            uiState.rideRequest?.let { request ->
+                val pickupLatLng = LatLng(
+                    request.pickupLocation["latitude"] ?: 0.0,
+                    request.pickupLocation["longitude"] ?: 0.0
+                )
+                Marker(state = MarkerState(position = pickupLatLng), title = "Jemput")
+
+                val destLatLng = LatLng(
+                    request.destinationLocation["latitude"] ?: 0.0,
+                    request.destinationLocation["longitude"] ?: 0.0
+                )
+                Marker(state = MarkerState(position = destLatLng), title = "Tujuan")
+
+                request.driverCurrentLocation?.let {
+                    val driverLatLng = LatLng(it["latitude"] ?: 0.0, it["longitude"] ?: 0.0)
+                    Marker(
+                        state = MarkerState(position = driverLatLng),
+                        title = "Driver",
+                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Tampilkan tombol HANYA untuk driver
-                    if (uiState.isDriver) {
-                        when (uiState.rideRequest?.status) {
-                            "accepted" -> {
-                                Button(
-                                    onClick = { onUpdateStatus("arrived") },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text("Sudah Sampai di Lokasi Jemput")
-                                }
-                            }
-
-                            "arrived" -> {
-                                Button(
-                                    onClick = { onUpdateStatus("started") },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text("Mulai Perjalanan")
-                                }
-                            }
-
-                            "started" -> {
-                                Button(
-                                    onClick = { onUpdateStatus("completed") },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text("Selesaikan Perjalanan")
-                                }
-                            }
-
-                            "completed" -> {
-                                Text("Perjalanan Selesai!")
-                            }
-                        }
-                    }
                 }
+            }
+        }
+
+        // --- TOMBOL KEMBALI DI ATAS KIRI ---
+        IconButton(
+            onClick = onBackClick,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(horizontal = 16.dp, vertical = 32.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surface)
+        ) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
+        }
+
+        // --- BOTTOM SHEET DI BAWAH ---
+        Box(modifier = Modifier.align(Alignment.BottomCenter)) {
+            if (uiState.isDriver) {
+                // Tampilan untuk Driver
+                // ... (Kode AnimatedVisibility untuk Driver tetap sama)
+                AnimatedVisibility(
+                    visible = uiState.rideRequest?.status != "completed",
+                    exit = slideOutVertically { it }
+                ) {
+                    TripDriverBottomSheet(
+                        uiState = uiState,
+                        onUpdateStatus = onUpdateStatus,
+                        onCancelTrip = onCancelTrip,
+                        onChatClick = { uiState.rideRequest?.id?.let { onChatClick(it) } }
+                    )
+                }
+
+                AnimatedVisibility(
+                    visible = uiState.rideRequest?.status == "completed",
+                    enter = slideInVertically { it }
+                ) {
+                    PaymentConfirmationCard(
+                        totalPayment = formatCurrency(10000),
+                        onConfirmClick = onFinishTrip
+                    )
+                }
+            } else {
+                // Tampilan untuk Penumpang
+                TripPassengerSheet(
+                    uiState = uiState,
+                    onCancelTrip = onCancelTrip,
+                    onChatClick = { uiState.rideRequest?.id?.let { onChatClick(it) } }
+                )
             }
         }
     }
 }
+@Preview(showSystemUi = true, name = "Trip Screen - Status Started")
+@Composable
+private fun TripScreenLayoutStartedPreview() {
+    TripScreenLayoutPreview(status = "started")
+}
 
-    @Preview(showBackground = true)
-    @Composable
-    fun TripScreenPreview() {
-//    data dummy
-        val fakeRideRequest = RideRequest(
-            status = "accepted",
-            pickupLocation = mapOf("latitude" to -6.892, "longitude" to 109.670),
-            destinationLocation = mapOf("latitude" to -6.902, "longitude" to 109.680),
-            driverCurrentLocation = mapOf("latitude" to -6.895, "longitude" to 109.675)
+@Preview(showSystemUi = true, name = "Trip Screen - Status Completed")
+@Composable
+private fun TripScreenLayoutCompletedPreview() {
+    TripScreenLayoutPreview(status = "completed")
+}
+
+@Composable
+private fun TripScreenLayoutPreview(status: String) {
+    val fakeRideRequest = RideRequest(status = status)
+    val fakeUiState = TripUiState(rideRequest = fakeRideRequest, isDriver = true)
+    JekSoedTheme {
+        TripScreenLayout(
+            uiState = fakeUiState,
+            cameraPositionState = rememberCameraPositionState(),
+            onUpdateStatus = {},
+            onCancelTrip = {},
+            onFinishTrip = {},
+            onChatClick = {},
+            onBackClick = {}
         )
-        val fakePolyline = PolyUtil.decode("mp`_F~`|iS_@y@g@s@o@u@") // Contoh polyline pendek
-
-//    fake state
-        val fakeUiState = TripUiState(
-            rideRequest = fakeRideRequest,
-            polylinePoints = fakePolyline,
-            isDriver = false
-        )
-
-//    untuk nampilin ui dengan data dummmy
-        val cameraState = rememberCameraPositionState()
-        JekSoedTheme {
-            TripScreenContent(
-                uiState = fakeUiState,
-                cameraPositionState = cameraState,
-                onUpdateStatus = {},
-                onChatClick = {},
-                onLogoutClick = {}
-            )
-        }
     }
+}

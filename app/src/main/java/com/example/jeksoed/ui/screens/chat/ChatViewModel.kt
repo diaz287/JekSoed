@@ -1,3 +1,5 @@
+// main/java/com/example/jeksoed/ui/screens/chat/ChatViewModel.kt
+
 package com.example.jeksoed.ui.screens.chat
 
 import androidx.lifecycle.SavedStateHandle
@@ -11,8 +13,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
-// Data class untuk menampung data satu pesan
+// Data class Message tidak berubah
 data class Message(
     val id: String = "",
     val text: String = "",
@@ -20,10 +23,13 @@ data class Message(
     val timestamp: Timestamp? = null
 )
 
-// Data class untuk menampung semua state yang dibutuhkan UI
+// --- PERBARUI UI STATE ---
 data class ChatUiState(
     val messages: List<Message> = emptyList(),
-    val messageText: String = "" // State untuk teks di input field
+    val messageText: String = "",
+    val otherUserName: String = "Memuat...", // Nama lawan bicara
+    val otherUserPhotoUrl: String? = null, // Foto lawan bicara
+    val currentUserPhotoUrl: String? = null // Foto pengguna saat ini
 )
 
 class ChatViewModel(
@@ -32,16 +38,56 @@ class ChatViewModel(
 
     private val rideRequestId: String = savedStateHandle.get<String>("rideRequestId")!!
     private val db = FirebaseFirestore.getInstance()
-    val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+    private val auth = FirebaseAuth.getInstance()
+    val currentUserId = auth.currentUser?.uid
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState = _uiState.asStateFlow()
 
     init {
-        listenForMessages()
+        if (currentUserId != null) {
+            listenForMessages()
+            loadUsersInfo()
+        }
+    }
+
+    // --- FUNGSI BARU UNTUK MENGAMBIL INFO PENGGUNA ---
+    private fun loadUsersInfo() {
+        viewModelScope.launch {
+            try {
+                // 1. Ambil data ride request untuk menemukan ID passenger dan driver
+                val rideRequestDoc = db.collection("ride_requests").document(rideRequestId).get().await()
+                val passengerId = rideRequestDoc.getString("passengerId")
+                val driverId = rideRequestDoc.getString("driverId")
+
+                val otherUserId = if (currentUserId == passengerId) driverId else passengerId
+
+                // Ambil foto profil user saat ini
+                val currentUserDoc = db.collection("users").document(currentUserId!!).get().await()
+                val currentUserPhoto = currentUserDoc.getString("photoUrl") // Asumsi nama field 'photoUrl'
+
+                if (otherUserId != null) {
+                    // 2. Ambil data user lawan bicara dari koleksi 'users'
+                    val otherUserDoc = db.collection("users").document(otherUserId).get().await()
+                    val otherUserName = otherUserDoc.getString("nama") ?: "User"
+                    val otherUserPhoto = otherUserDoc.getString("photoUrl")
+
+                    _uiState.update {
+                        it.copy(
+                            otherUserName = otherUserName,
+                            otherUserPhotoUrl = otherUserPhoto,
+                            currentUserPhotoUrl = currentUserPhoto
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(otherUserName = "Error") }
+            }
+        }
     }
 
     private fun listenForMessages() {
+        // Fungsi ini tidak berubah
         db.collection("chats").document(rideRequestId).collection("messages")
             .orderBy("timestamp", Query.Direction.ASCENDING)
             .addSnapshotListener { snapshot, e ->
@@ -54,13 +100,13 @@ class ChatViewModel(
             }
     }
 
-    // Fungsi untuk mengubah state saat user mengetik
     fun onMessageChanged(newText: String) {
+        // Fungsi ini tidak berubah
         _uiState.update { it.copy(messageText = newText) }
     }
 
-    // Fungsi untuk mengirim pesan
     fun sendMessage() {
+        // Fungsi ini tidak berubah
         val textToSend = _uiState.value.messageText.trim()
         if (textToSend.isBlank() || currentUserId == null) return
 
@@ -71,7 +117,6 @@ class ChatViewModel(
         )
         db.collection("chats").document(rideRequestId).collection("messages").add(message)
 
-        // Kosongkan input field setelah dikirim
         _uiState.update { it.copy(messageText = "") }
     }
 }

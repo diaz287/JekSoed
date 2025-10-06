@@ -22,6 +22,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.jeksoed.R
+import com.example.jeksoed.ui.screens.activity.ActivityScreen
 import com.example.jeksoed.ui.theme.JekSoedTheme
 
 // Data class untuk item di bottom bar
@@ -119,10 +120,7 @@ fun DriverBottomNavGraph(mainNavController: NavController, bottomNavController: 
             DriverHomeScreen(navController = mainNavController)
         }
         composable("driver_activity") {
-            // Placeholder untuk halaman riwayat
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Halaman Riwayat Orderan")
-            }
+            ActivityScreen(navController = mainNavController)
         }
         composable("driver_profil") {
             // Placeholder untuk halaman profil

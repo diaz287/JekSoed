@@ -1,3 +1,5 @@
+// main/java/com/example/jeksoed/ui/screens/driver/DriverHomeViewModel.kt
+
 package com.example.jeksoed.ui.screens.driver
 
 import android.util.Log
@@ -16,7 +18,9 @@ import kotlinx.coroutines.launch
 data class DriverHomeUiState(
     val rideRequests: List<RideRequest> = emptyList(),
     val isLoading: Boolean = true,
-    val acceptingRideId: String? = null
+    val acceptingRideId: String? = null,
+    // --- TAMBAHKAN STATE BARU UNTUK POP-UP ---
+    val popupRideRequest: RideRequest? = null
 )
 
 class DriverHomeViewModel : ViewModel() {
@@ -25,9 +29,7 @@ class DriverHomeViewModel : ViewModel() {
     private val auth = FirebaseAuth.getInstance()
     private var rideRequestListener: ListenerRegistration? = null
 
-    // State private yang hanya bisa diubah oleh ViewModel
     private val _uiState = MutableStateFlow(DriverHomeUiState())
-    // State public yang hanya bisa dibaca oleh UI
     val uiState = _uiState.asStateFlow()
 
     init {
@@ -46,12 +48,34 @@ class DriverHomeViewModel : ViewModel() {
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
-                    val requests = snapshot.documents.mapNotNull { doc ->
+                    val currentRequests = _uiState.value.rideRequests
+                    val newRequests = snapshot.documents.mapNotNull { doc ->
                         doc.toObject(RideRequest::class.java)?.copy(id = doc.id)
                     }
-                    _uiState.update { it.copy(isLoading = false, rideRequests = requests) }
+
+                    // --- LOGIKA UNTUK MENDETEKSI PESANAN BARU ---
+                    val newPopupRequest = newRequests.firstOrNull()
+                    val lastShownPopupId = _uiState.value.popupRideRequest?.id
+                    val currentTopRequestId = currentRequests.firstOrNull()?.id
+
+                    // Tampilkan pop-up jika ada request baru dan request teratas berbeda dari sebelumnya
+                    val shouldShowPopup = newPopupRequest != null && newPopupRequest.id != currentTopRequestId
+
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            rideRequests = newRequests,
+                            // Set state pop-up jika kondisi terpenuhi
+                            popupRideRequest = if (shouldShowPopup) newPopupRequest else it.popupRideRequest
+                        )
+                    }
                 }
             }
+    }
+
+    // --- FUNGSI BARU UNTUK MENGHILANGKAN POP-UP ---
+    fun dismissPopup() {
+        _uiState.update { it.copy(popupRideRequest = null) }
     }
 
     fun acceptRide(rideId: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
@@ -64,17 +88,29 @@ class DriverHomeViewModel : ViewModel() {
             return
         }
 
+        // Saat menerima, langsung sembunyikan pop-up juga
+        dismissPopup()
+
         firestore.collection("ride_requests").document(rideId)
             .update(mapOf("status" to "accepted", "driverId" to driverId))
             .addOnSuccessListener {
                 _uiState.update { it.copy(acceptingRideId = null) }
-                onSuccess() // Panggil callback sukses jika berhasil
+                onSuccess()
             }
             .addOnFailureListener { e ->
                 _uiState.update { it.copy(acceptingRideId = null) }
-                onFailure(e) // Panggil callback gagal jika error
+                onFailure(e)
             }
     }
+
+    // --- FUNGSI BARU UNTUK MENOLAK PESANAN ---
+    fun rejectRide(rideId: String) {
+        // Logika untuk menolak bisa berupa menghapus atau mengupdate status
+        // Untuk saat ini, kita anggap menolak berarti menyembunyikan pop-up
+        dismissPopup()
+        // Anda bisa menambahkan logika lain di sini, misal update status ke "rejected"
+    }
+
 
     fun logout() {
         auth.signOut()
@@ -82,6 +118,6 @@ class DriverHomeViewModel : ViewModel() {
 
     override fun onCleared() {
         super.onCleared()
-        rideRequestListener?.remove() // Penting untuk membersihkan listener!
+        rideRequestListener?.remove()
     }
 }

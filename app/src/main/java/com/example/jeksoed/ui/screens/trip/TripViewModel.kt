@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.tasks.await
 
 sealed class TripNavEvent {
     object NavigateToDriverHome : TripNavEvent()
@@ -36,7 +37,10 @@ sealed class TripNavEvent {
 data class TripUiState(
     val rideRequest: RideRequest? = null,
     val polylinePoints: List<LatLng> = emptyList(),
-    val isDriver: Boolean = false
+    val isDriver: Boolean = false,
+    val otherUserName: String = "Memuat...",
+    val otherUserPhotoUrl: String? = null,
+    val otherUserExtraInfo: String? = null
 )
 
 class TripViewModel(
@@ -50,7 +54,6 @@ class TripViewModel(
     private var rideRequestListener: ListenerRegistration? = null
     private var locationCallback: LocationCallback? = null
 
-    // State yang akan diobservasi oleh UI
     private val _uiState = MutableStateFlow(TripUiState())
     val uiState = _uiState.asStateFlow()
     private val _navEvent = MutableSharedFlow<TripNavEvent>()
@@ -71,6 +74,7 @@ class TripViewModel(
                 }
                 if (snapshot != null && snapshot.exists()) {
                     val request = snapshot.toObject(RideRequest::class.java)?.copy(id = snapshot.id)
+                    val isDriver = request?.driverId == currentUserId
 
                     _uiState.update { currentState ->
                         currentState.copy(
@@ -79,13 +83,13 @@ class TripViewModel(
                             polylinePoints = request?.encodedPolyline?.let { PolyUtil.decode(it) } ?: emptyList()
                         )
                     }
+                    loadOtherUserInfo(isDriver = isDriver, rideRequest = request)
 
                     if (request?.status == "completed") {
                         viewModelScope.launch {
-                            if (_uiState.value.isDriver) {
-                                _navEvent.emit(TripNavEvent.NavigateToDriverHome)
-                            } else {
-                                val driverId = request?.driverId
+                            // Navigasi ke RatingScreen untuk penumpang
+                            if (!isDriver) {
+                                val driverId = request.driverId
                                 if (driverId != null) {
                                     _navEvent.emit(TripNavEvent.NavigateToRatingScreen(driverId))
                                 }
@@ -94,6 +98,29 @@ class TripViewModel(
                     }
                 }
             }
+    }
+
+    private fun loadOtherUserInfo(isDriver: Boolean, rideRequest: RideRequest?) {
+        viewModelScope.launch {
+            if (rideRequest == null) return@launch
+            val otherUserId = if (isDriver) rideRequest.passengerId else rideRequest.driverId
+
+            if (otherUserId != null && otherUserId.isNotBlank()) {
+                try {
+                    val userDoc = db.collection("users").document(otherUserId).get().await()
+                    _uiState.update {
+                        it.copy(
+                            otherUserName = userDoc.getString("nama") ?: "User",
+                            otherUserPhotoUrl = userDoc.getString("photoUrl"),
+                            otherUserExtraInfo = if (!isDriver) userDoc.getString("platNomor") else null // Ambil plat jika user adalah penumpang
+                        )
+                    }
+                } catch (e: Exception) {
+                    Log.e("TripViewModel", "Gagal memuat info user lain", e)
+                    _uiState.update { it.copy(otherUserName = "Tidak Ditemukan") }
+                }
+            }
+        }
     }
 
     fun startLocationUpdates(fusedLocationClient: FusedLocationProviderClient, context: Context) {
@@ -149,5 +176,22 @@ class TripViewModel(
 
     fun logout() {
         auth.signOut()
+    }
+
+
+    fun finishAndNavigateHome() {
+        viewModelScope.launch {
+            _navEvent.emit(TripNavEvent.NavigateToDriverHome)
+        }
+    }
+
+    // --- FUNGSI BARU: Untuk membatalkan perjalanan ---
+    fun cancelTrip() {
+        // Logika pembatalan bisa lebih kompleks, misal: update status ke "cancelled"
+        // Untuk saat ini, kita langsung arahkan driver kembali ke home
+        updateTripStatus("cancelled") // Opsional: update status di DB
+        viewModelScope.launch {
+            _navEvent.emit(TripNavEvent.NavigateToDriverHome)
+        }
     }
 }

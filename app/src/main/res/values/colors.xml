@@ -9,4 +9,5 @@
     <color name="white">#FFFFFFFF</color>
     <color name="unsoed">#FFD803</color>
     <color name="unsoed_dark">#CCAD02</color>
+    <color name="unsoed_light">#FFF3B1</color>
 </resources>

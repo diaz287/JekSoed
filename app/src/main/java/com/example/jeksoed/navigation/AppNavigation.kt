@@ -29,11 +29,14 @@ import com.example.jeksoed.ui.screens.splash.SplashScreen
 import com.example.jeksoed.ui.screens.trip.TripScreen
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.navigation
+import com.example.jeksoed.ui.screens.activity.ActivityDetailScreen
 import com.example.jeksoed.ui.screens.auth.RegisterDriverStep1Screen
 import com.example.jeksoed.ui.screens.auth.RegisterDriverStep2Screen
 import com.example.jeksoed.ui.screens.auth.RegisterDriverStep3Screen
 import com.example.jeksoed.ui.screens.auth.RegisterDriverViewModel
 import com.example.jeksoed.ui.screens.driver.DriverMainScreen
+import com.example.jeksoed.ui.screens.passenger.EditProfileScreen
+import com.example.jeksoed.ui.screens.trip.TripCompletedScreen
 
 // Sealed class Screen tidak perlu diubah
 sealed class Screen(val route: String) {
@@ -59,12 +62,20 @@ sealed class Screen(val route: String) {
     object Trip : Screen("trip/{rideRequestId}") {
         fun createRoute(rideRequestId: String) = "trip/$rideRequestId"
     }
+    object TripCompleted : Screen("trip_completed/{rideRequestId}") {
+        fun createRoute(rideRequestId: String) = "trip_completed/$rideRequestId"
+    }
+
     object Rating : Screen("rating/{driverId}") {
         fun createRoute(driverId: String) = "rating/$driverId"
     }
     object Chat : Screen("chat/{rideRequestId}") {
         fun createRoute(rideRequestId: String) = "chat/$rideRequestId"
     }
+    object ActivityDetail : Screen("activity_detail/{rideRequestId}") {
+        fun createRoute(rideRequestId: String) = "activity_detail/$rideRequestId"
+    }
+    object EditProfile : Screen("edit_profile")
 }
 
 
@@ -79,6 +90,9 @@ fun AppNavigation() {
         composable(Screen.RoleSelection.route) { RoleSelectionScreen(navController) }
         composable(Screen.Tnc.route) { TncScreen(navController) }
         composable(Screen.ForgotPassword.route) { ForgotPasswordScreen(navController) }
+        composable(Screen.EditProfile.route) {
+            EditProfileScreen(navController = navController)
+        }
 
         // --- HANYA SATU BLOK COMPOSABLE UNTUK REGISTER ---
         composable(
@@ -145,7 +159,16 @@ fun AppNavigation() {
             }
         }
         composable(Screen.Trip.route) {
-            TripScreen(navController = navController)
+            // Kita perlu meneruskan rideRequestId ke TripScreen
+            val rideRequestId = it.arguments?.getString("rideRequestId") ?: ""
+            TripScreen(navController = navController, rideRequestId = rideRequestId)
+        }
+        composable(
+            route = Screen.TripCompleted.route,
+            arguments = listOf(navArgument("rideRequestId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val rideRequestId = backStackEntry.arguments?.getString("rideRequestId") ?: ""
+            TripCompletedScreen(navController = navController, rideRequestId = rideRequestId)
         }
         composable(
             route = Screen.Rating.route,
@@ -161,6 +184,13 @@ fun AppNavigation() {
             if (rideRequestId != null) {
                 ChatScreen(navController = navController,rideRequestId = rideRequestId)
             }
+        }
+        composable(
+            route = Screen.ActivityDetail.route,
+            arguments = listOf(navArgument("rideRequestId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val rideRequestId = backStackEntry.arguments?.getString("rideRequestId") ?: ""
+            ActivityDetailScreen(navController = navController, rideRequestId = rideRequestId)
         }
     }
 }
