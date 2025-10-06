@@ -2,6 +2,9 @@
 
 package com.example.jeksoed.ui.screens.chat
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,6 +31,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
+import android.net.Uri
 import com.example.jeksoed.R
 import com.example.jeksoed.ui.theme.JekSoedTheme
 import com.google.firebase.Timestamp
@@ -36,11 +41,16 @@ import com.google.firebase.Timestamp
 @Composable
 fun ChatScreen(
     navController: NavController,
-    rideRequestId: String, // Diterima dari NavGraph
     viewModel: ChatViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri: Uri? ->
+            uri?.let { viewModel.sendImage(it) }
+        }
+    )
 
     // Auto-scroll ke bawah saat ada pesan baru
     LaunchedEffect(uiState.messages) {
@@ -60,8 +70,14 @@ fun ChatScreen(
         bottomBar = {
             MessageInput(
                 value = uiState.messageText,
+                isUploading = uiState.isUploading,
                 onValueChange = { viewModel.onMessageChanged(it) },
-                onSendClick = { viewModel.sendMessage() }
+                onSendClick = { viewModel.sendMessage() },
+                onAttachClick = {
+                    imagePickerLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                }
             )
         }
     ) { paddingValues ->
@@ -154,11 +170,26 @@ fun MessageBubble(
             shape = bubbleShape,
             colors = CardDefaults.cardColors(containerColor = bubbleColor)
         ) {
-            Text(
-                text = message.text,
-                color = textColor,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
-            )
+            when (message.type) {
+                "image" -> {
+                    AsyncImage(
+                        model = message.imageUrl,
+                        contentDescription = "Gambar terkirim",
+                        modifier = Modifier
+                            .padding(4.dp)
+                            .sizeIn(maxWidth = 200.dp, maxHeight = 250.dp)
+                            .clip(RoundedCornerShape(12.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+                else -> { // "text"
+                    Text(
+                        text = message.text,
+                        color = textColor,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                    )
+                }
+            }
         }
 
         // Tampilkan foto profil di kanan untuk pesan kita
@@ -176,7 +207,13 @@ fun MessageBubble(
 
 // --- COMPOSABLE YANG DIPERBARUI UNTUK INPUT PESAN ---
 @Composable
-fun MessageInput(value: String, onValueChange: (String) -> Unit, onSendClick: () -> Unit) {
+fun MessageInput(
+    value: String,
+    isUploading: Boolean,
+    onValueChange: (String) -> Unit,
+    onSendClick: () -> Unit,
+    onAttachClick: () -> Unit
+) {
     Surface(shadowElevation = 8.dp) {
         OutlinedTextField(
             value = value,
@@ -191,7 +228,13 @@ fun MessageInput(value: String, onValueChange: (String) -> Unit, onSendClick: ()
                 if (value.isBlank()) {
                     Row {
                         Icon(Icons.Outlined.Mic, contentDescription = "Voice Message", modifier = Modifier.padding(horizontal = 8.dp))
-                        Icon(Icons.Outlined.PhotoCamera, contentDescription = "Send Image", modifier = Modifier.padding(horizontal = 8.dp))
+                        IconButton(onClick = onAttachClick, enabled = !isUploading) {
+                            if (isUploading) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                            } else {
+                                Icon(Icons.Outlined.PhotoCamera, contentDescription = "Kirim Gambar")
+                            }
+                        }
                     }
                 } else {
                     IconButton(onClick = onSendClick) {
@@ -234,8 +277,10 @@ private fun ChatScreenPreview() {
             bottomBar = {
                 MessageInput(
                     value = dummyUiState.messageText,
+                    isUploading = false,
                     onValueChange = {},
-                    onSendClick = {}
+                    onSendClick = {},
+                    onAttachClick = {}
                 )
             }
         ) { padding ->

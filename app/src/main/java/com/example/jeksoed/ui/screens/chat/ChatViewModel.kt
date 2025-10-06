@@ -2,6 +2,7 @@
 
 package com.example.jeksoed.ui.screens.chat
 
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -9,16 +10,20 @@ import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.util.UUID
 
 // Data class Message tidak berubah
 data class Message(
     val id: String = "",
     val text: String = "",
+    val imageUrl: String? = null,
+    val type: String = "text",
     val senderId: String = "",
     val timestamp: Timestamp? = null
 )
@@ -27,6 +32,7 @@ data class Message(
 data class ChatUiState(
     val messages: List<Message> = emptyList(),
     val messageText: String = "",
+    val isUploading: Boolean = false,
     val otherUserName: String = "Memuat...", // Nama lawan bicara
     val otherUserPhotoUrl: String? = null, // Foto lawan bicara
     val currentUserPhotoUrl: String? = null // Foto pengguna saat ini
@@ -39,6 +45,7 @@ class ChatViewModel(
     private val rideRequestId: String = savedStateHandle.get<String>("rideRequestId")!!
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
+    private val storage = FirebaseStorage.getInstance()
     val currentUserId = auth.currentUser?.uid
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -87,7 +94,6 @@ class ChatViewModel(
     }
 
     private fun listenForMessages() {
-        // Fungsi ini tidak berubah
         db.collection("chats").document(rideRequestId).collection("messages")
             .orderBy("timestamp", Query.Direction.ASCENDING)
             .addSnapshotListener { snapshot, e ->
@@ -101,12 +107,10 @@ class ChatViewModel(
     }
 
     fun onMessageChanged(newText: String) {
-        // Fungsi ini tidak berubah
         _uiState.update { it.copy(messageText = newText) }
     }
 
     fun sendMessage() {
-        // Fungsi ini tidak berubah
         val textToSend = _uiState.value.messageText.trim()
         if (textToSend.isBlank() || currentUserId == null) return
 
@@ -118,5 +122,38 @@ class ChatViewModel(
         db.collection("chats").document(rideRequestId).collection("messages").add(message)
 
         _uiState.update { it.copy(messageText = "") }
+    }
+
+    fun sendImage(uri: Uri) {
+        if (currentUserId == null) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isUploading = true) }
+            try {
+                // 1. Buat path unik untuk file di Storage
+                val fileName = "${UUID.randomUUID()}.jpg"
+                val storageRef = storage.reference.child("chats/$rideRequestId/$currentUserId/$fileName")
+
+                // 2. Upload file
+                storageRef.putFile(uri).await()
+
+                // 3. Dapatkan URL download
+                val downloadUrl = storageRef.downloadUrl.await().toString()
+
+                // 4. Simpan pesan tipe gambar ke Firestore
+                val message = hashMapOf(
+                    "type" to "image",
+                    "imageUrl" to downloadUrl,
+                    "senderId" to currentUserId,
+                    "timestamp" to Timestamp.now()
+                )
+                db.collection("chats").document(rideRequestId).collection("messages").add(message)
+
+            } catch (e: Exception) {
+                // Handle error (misal: tampilkan Toast)
+            } finally {
+                _uiState.update { it.copy(isUploading = false) }
+            }
+        }
     }
 }
