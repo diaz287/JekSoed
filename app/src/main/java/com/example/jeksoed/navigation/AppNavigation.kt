@@ -33,6 +33,8 @@ import com.example.jeksoed.ui.screens.auth.RegisterDriverStep1Screen
 import com.example.jeksoed.ui.screens.auth.RegisterDriverStep2Screen
 import com.example.jeksoed.ui.screens.auth.RegisterDriverStep3Screen
 import com.example.jeksoed.ui.screens.auth.RegisterDriverViewModel
+import com.example.jeksoed.ui.screens.driver.AllOrdersScreen
+import com.example.jeksoed.ui.screens.driver.DriverHomeViewModel
 import com.example.jeksoed.ui.screens.driver.DriverMainScreen
 import com.example.jeksoed.ui.screens.passenger.EditProfileScreen
 import com.example.jeksoed.ui.screens.trip.TripCompletedScreen
@@ -75,12 +77,14 @@ sealed class Screen(val route: String) {
         fun createRoute(rideRequestId: String) = "activity_detail/$rideRequestId"
     }
     object EditProfile : Screen("edit_profile")
+    object AllOrders : Screen("all_orders")
 }
 
 
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
+    val driverHomeViewModel: DriverHomeViewModel = viewModel()
 
     NavHost(navController, startDestination = Screen.Splash.route) {
         composable(Screen.Splash.route) { SplashScreen(navController) }
@@ -98,13 +102,7 @@ fun AppNavigation() {
             route = Screen.Register.route,
             arguments = listOf(navArgument("role") { type = NavType.StringType })
         ) { backStackEntry ->
-            val role = backStackEntry.arguments?.getString("role") ?: "penumpang"
-            if (role == "penumpang") {
-                RegisterPassengerScreen(navController = navController)
-            } else {
-                // Arahkan ke awal alur registrasi driver
-                navController.navigate(Screen.RegisterDriverGraph.route)
-            }
+            RegisterPassengerScreen(navController = navController)
         }
 
         // --- TAMBAHKAN NESTED NAVIGATION GRAPH UNTUK REGISTRASI DRIVER ---
@@ -190,6 +188,9 @@ fun AppNavigation() {
         ) { backStackEntry ->
             val rideRequestId = backStackEntry.arguments?.getString("rideRequestId") ?: ""
             ActivityDetailScreen(navController = navController, rideRequestId = rideRequestId)
+        }
+        composable(Screen.AllOrders.route) {
+            AllOrdersScreen(navController, viewModel = driverHomeViewModel)
         }
     }
 }

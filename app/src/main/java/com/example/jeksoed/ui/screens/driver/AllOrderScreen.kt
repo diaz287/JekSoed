@@ -1,14 +1,17 @@
-// main/java/com/example/jeksoed/ui/screens/driver/components/RideRequestPopup.kt
+package com.example.jeksoed.ui.screens.driver
 
-package com.example.jeksoed.ui.screens.driver.components
-
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
@@ -16,48 +19,112 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.jeksoed.R
 import com.example.jeksoed.data.model.RideRequest
-import com.example.jeksoed.ui.screens.driver.PassengerInfo
-import com.example.jeksoed.ui.theme.JekSoedTheme
-import com.google.firebase.Timestamp
+import com.example.jeksoed.navigation.Screen
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.tasks.await
 
+// Data class untuk menampung info penumpang
 data class PassengerInfo(
     val name: String = "Penumpang",
     val photoUrl: String? = null
 )
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RideRequestPopup(
+fun AllOrdersScreen(navController: NavController, viewModel: DriverHomeViewModel = viewModel()) {
+    val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Daftar Orderan Masuk") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Kembali")
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
+        if (uiState.rideRequests.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Belum ada orderan yang masuk.")
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(uiState.rideRequests) { request ->
+                    RideRequestCard(
+                        rideRequest = request,
+                        onAccept = { rideId ->
+                            viewModel.acceptRide(
+                                rideId = rideId,
+                                onSuccess = {
+                                    Toast.makeText(context, "Orderan diterima!", Toast.LENGTH_SHORT).show()
+                                    navController.navigate(Screen.Trip.createRoute(rideId)) {
+                                        popUpTo(Screen.AllOrders.route) { inclusive = true }
+                                    }
+                                },
+                                onFailure = { error ->
+                                    Toast.makeText(context, "Gagal: ${error.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            )
+                        },
+                        onReject = { rideId ->
+                            viewModel.rejectRide(rideId)
+                            Toast.makeText(context, "Orderan ditolak", Toast.LENGTH_SHORT).show()
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun RideRequestCard(
     rideRequest: RideRequest,
     onAccept: (String) -> Unit,
     onReject: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Mengambil info lengkap penumpang (nama & foto) dari Firestore
     val passengerInfo by produceState(initialValue = PassengerInfo(), rideRequest.passengerId) {
         value = getPassengerInfo(rideRequest.passengerId)
     }
+
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(16.dp),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Bagian Info Penumpang dan Rute
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Ganti dengan gambar profil penumpang jika ada
+                // Gunakan AsyncImage dari Coil untuk memuat foto profil
                 AsyncImage(
                     model = passengerInfo.photoUrl, // <-- DIUBAH DARI profilePictureUrl
                     contentDescription = "Foto Penumpang",
@@ -70,23 +137,33 @@ fun RideRequestPopup(
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    // Ganti dengan nama penumpang jika ada
                     Text(passengerInfo.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     Spacer(modifier = Modifier.height(8.dp))
-                    // Rute
-                    RouteInfoRow(iconRes = R.drawable.blue_icon, location = "FK Unsoed") // Ganti dengan data asli
+                    RouteInfoRow(
+                        iconRes = R.drawable.blue_icon,
+                        location = rideRequest.pickupName ?: "Lokasi Jemput"
+                    )
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp, horizontal = 8.dp))
-                    RouteInfoRow(iconRes = R.drawable.locatio_icon, location = "Rumah Sakit Wiradadi") // Ganti dengan data asli
+                    RouteInfoRow(
+                        iconRes = R.drawable.locatio_icon,
+                        location = rideRequest.destinationName ?: "Lokasi Tujuan"
+                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Bagian Tombol Aksi
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                Text(
+                    text = "${rideRequest.distance} • ${rideRequest.duration}",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray
+                )
                 Button(
                     onClick = { onReject(rideRequest.id) },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFDE0E0)),
@@ -101,14 +178,13 @@ fun RideRequestPopup(
                     Text("Tolak", color = Color.Red)
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-
                 Button(
                     onClick = { onAccept(rideRequest.id) },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDFF9E9)),
                     shape = RoundedCornerShape(50)
                 ) {
                     Icon(
-                        painter = painterResource(id = R.drawable.check), // Pastikan Anda punya drawable 'check'
+                        painter = painterResource(id = R.drawable.check),
                         contentDescription = "Terima",
                         tint = Color(0xFF219800)
                     )
@@ -138,16 +214,11 @@ private fun RouteInfoRow(iconRes: Int, location: String) {
         )
     }
 }
-private suspend fun getPassengerName(passengerId: String): String {
-    if (passengerId.isBlank()) return "Penumpang"
-    return try {
-        val document = Firebase.firestore.collection("users").document(passengerId).get().await()
-        document.getString("nama") ?: "Penumpang"
-    } catch (e: Exception) {
-        "Penumpang"
-    }
-}
-private suspend fun getPassengerInfo(passengerId: String): com.example.jeksoed.ui.screens.driver.PassengerInfo {
+
+/**
+ * Mengambil nama dan URL foto profil penumpang dari koleksi 'users' di Firestore.
+ */
+private suspend fun getPassengerInfo(passengerId: String): PassengerInfo {
     if (passengerId.isBlank()) return PassengerInfo()
     return try {
         val document = Firebase.firestore.collection("users").document(passengerId).get().await()
@@ -156,26 +227,5 @@ private suspend fun getPassengerInfo(passengerId: String): com.example.jeksoed.u
         PassengerInfo(name, photoUrl)
     } catch (e: Exception) {
         PassengerInfo()
-    }
-}
-
-@Preview(name = "Ride Request Notification Popup", showBackground = true)
-@Composable
-private fun RideRequestPopupPreview() {
-    // Kita buat data palsu (dummy) untuk ditampilkan di preview
-    val dummyRideRequest = RideRequest(
-        id = "dummy123",
-        passengerId = "passengerXYZ",
-        status = "pending",
-        createdAt = Timestamp.now()
-        // Anda bisa menambahkan data lokasi palsu jika diperlukan
-    )
-
-    JekSoedTheme {
-        RideRequestPopup(
-            rideRequest = dummyRideRequest,
-            onAccept = { },
-            onReject = { }
-        )
     }
 }

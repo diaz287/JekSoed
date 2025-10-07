@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
@@ -33,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import coil.compose.AsyncImage
 import com.example.jeksoed.R
 import com.example.jeksoed.navigation.Screen
 import com.example.jeksoed.ui.screens.driver.components.RideRequestPopup
@@ -94,6 +96,31 @@ fun DriverHomeScreen(navController: NavController,viewModel: DriverHomeViewModel
             }
         }
 
+        StatusIndicator(
+            isOnline = isOnline,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
+
+        NotificationButton(
+            onNotificationClick = {
+                navController.navigate(Screen.AllOrders.route)
+            },
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 16.dp, end = 16.dp)
+        )
+
+        DriverInfoCard(
+            uiState = uiState, // Mengirim seluruh UiState
+            onToggleStatus = {
+                if (uiState.isOnline) {
+                    showOfflineDialog = true // Tampilkan dialog jika sedang online
+                } else {
+                    viewModel.setOnlineStatus(true) // Langsung online jika sedang offline
+                }
+            },
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
 
         // --- POP-UP NOTIFIKASI ---
         AnimatedVisibility(
@@ -122,43 +149,17 @@ fun DriverHomeScreen(navController: NavController,viewModel: DriverHomeViewModel
                 )
             }
         }
-
-        StatusIndicator(
-            isOnline = isOnline,
-            modifier = Modifier.align(Alignment.TopCenter)
-        )
-
-        NotificationButton(
-            onNotificationClick = { /*TODO*/ },
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 16.dp, end = 16.dp)
-        )
-
-        DriverInfoCard(
-            modifier = Modifier
-                .align(Alignment.BottomCenter),
-            onToggleStatus = {
-                if (isOnline) {
-                    showOfflineDialog = true
-                } else {
-                    isOnline = true
-                }
-            },
-            isOnline = isOnline
-        )
     }
 }
 
 @Composable
 private fun StatusIndicator(isOnline: Boolean, modifier: Modifier = Modifier) {
-    // --- PERUBAHAN WARNA KONDISIONAL ---
     val backgroundColor = if (isOnline) Color(0xFFFFC107) else Color.White
     val textColor = if (isOnline) Color.Black else Color.Gray
 
     Card(
         modifier = modifier.offset(y=24.dp),
-        shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = backgroundColor)
     ) {
         Text(
@@ -184,9 +185,9 @@ private fun NotificationButton(onNotificationClick: () -> Unit, modifier: Modifi
 
 @Composable
 private fun DriverInfoCard(
-    modifier: Modifier = Modifier,
-    isOnline: Boolean,
-    onToggleStatus: () -> Unit
+    uiState: DriverHomeUiState, // Menerima UiState
+    onToggleStatus: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -198,31 +199,33 @@ private fun DriverInfoCard(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.person_icon),
+                AsyncImage(
+                    model = uiState.driverProfile.photoUrl,
                     contentDescription = "Foto Profil",
+                    placeholder = painterResource(id = R.drawable.person_icon),
+                    error = painterResource(id = R.drawable.person_icon),
+                    contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .size(50.dp)
                         .clip(CircleShape)
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Fajar Nugros", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    Text("R 6666 CA", color = Color.Gray, fontSize = 14.sp)
+                    Text(uiState.driverProfile.name, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text(uiState.driverProfile.licensePlate, color = Color.Gray, fontSize = 14.sp)
                 }
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        // --- PERUBAHAN WARNA KONDISIONAL ---
-                        .background(if (isOnline) colorResource(R.color.unsoed) else Color.White)
+                        .background(if (uiState.isOnline) colorResource(R.color.unsoed) else Color.White)
                         .clickable { onToggleStatus() }
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.power_icon),
                         contentDescription = "Toggle Status",
-                        tint = if (isOnline) Color.Black else Color.Gray,
+                        tint = if (uiState.isOnline) Color.Black else Color.Gray,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -238,9 +241,9 @@ private fun DriverInfoCard(
                         .padding(16.dp),
                     horizontalArrangement = Arrangement.SpaceAround
                 ) {
-                    InfoItem("Balance", "Rp150.000,-")
-                    InfoItem("Rating", "4.8")
-                    InfoItem("Orderan", "5")
+                    InfoItem("Balance", uiState.driverProfile.balance)
+                    InfoItem("Rating", uiState.driverProfile.rating)
+                    InfoItem("Orderan", uiState.driverProfile.orderCount)
                 }
             }
         }
@@ -344,14 +347,42 @@ private fun DriverHomeScreenPreview() {
 @Composable
 private fun DriverInfoCardOnlinePreview() {
     JekSoedTheme {
-        DriverInfoCard(isOnline = true, onToggleStatus = {})
+        val dummyUiState = DriverHomeUiState(
+            isOnline = true,
+            driverProfile = DriverProfile(
+                name = "Diaz",
+                licensePlate = "B 1234 ABC",
+                photoUrl = null,
+                balance = "Rp150.000,-",
+                rating = "4.9",
+                orderCount = "10"
+            )
+        )
+        DriverInfoCard(
+            uiState = dummyUiState,
+            onToggleStatus = {}
+        )
     }
 }
 @Preview(name = "Info Card (Offline)")
 @Composable
 private fun DriverInfoCardOfflinePreview() {
     JekSoedTheme {
-        DriverInfoCard(isOnline = false, onToggleStatus = {})
+        val dummyUiState = DriverHomeUiState(
+            isOnline = true,
+            driverProfile = DriverProfile(
+                name = "Diaz",
+                licensePlate = "B 1234 ABC",
+                photoUrl = null,
+                balance = "Rp150.000,-",
+                rating = "4.9",
+                orderCount = "10"
+            )
+        )
+        DriverInfoCard(
+            uiState = dummyUiState,
+            onToggleStatus = {}
+        )
     }
 }
 

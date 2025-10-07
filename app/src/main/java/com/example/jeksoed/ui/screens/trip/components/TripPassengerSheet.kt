@@ -33,6 +33,7 @@ fun TripPassengerSheet(
     onChatClick: () -> Unit
 ) {
     val rideRequest = uiState.rideRequest ?: return
+    val driver = uiState.otherUser
     val isCancelDisabled = rideRequest.status == "started"
 
     Card(
@@ -53,8 +54,8 @@ fun TripPassengerSheet(
 
             // Info Driver
             DriverInfo(
-                name = uiState.otherUserName,
-                plate = uiState.otherUserExtraInfo ?: "R 6666 CA",
+                name = driver?.nama ?: "Memuat...",
+                plate = driver?.licensePlate ?: "Belum diatur",
                 onChatClick = onChatClick
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))

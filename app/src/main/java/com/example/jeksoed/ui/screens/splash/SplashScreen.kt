@@ -22,55 +22,69 @@ import com.google.firebase.ktx.Firebase
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
 @Composable
 fun SplashScreen(navController: NavController) {
     val auth = FirebaseAuth.getInstance()
     LaunchedEffect(key1 = true) {
-        delay(2000)
-        if (auth.currentUser == null) {
-            // Jika tidak ada user yang login, langsung ke halaman Login
-            navController.navigate(Screen.Cta.route) {
-                popUpTo(Screen.Splash.route) { inclusive = true }
+        // Jalankan penundaan dan logika navigasi secara bersamaan
+        coroutineScope {
+            launch {
+                delay(1500) // Penundaan minimum agar logo terlihat
             }
-        } else {
-            try {
-                val token = FirebaseMessaging.getInstance().token.await()
-                FirebaseFirestore.getInstance().collection("users").document(auth.currentUser!!.uid)
-                    .update("fcmToken", token)
-            } catch (e: Exception) {
-                Log.w("SplashScreen", "Gagal mendapatkan FCM token", e)
-            }
-            // Jika ada user yang login, cek perannya di Firestore
-            val uid = auth.currentUser!!.uid
-            Firebase.firestore.collection("users").document(uid).get()
-                .addOnSuccessListener { document ->
-                    val userRole = document.getString("role")
-                    val destination = when (userRole) {
-                        "penumpang" -> Screen.PassengerMain.route
-                        "driver" -> Screen.DriverMain.route
-                        else -> Screen.Login.route // Fallback jika role tidak ditemukan
-                    }
-                    navController.navigate(destination) {
+
+            launch {
+                if (auth.currentUser == null) {
+                    navController.navigate(Screen.Cta.route) {
                         popUpTo(Screen.Splash.route) { inclusive = true }
                     }
-                }
-                .addOnFailureListener {
-                    // Jika gagal mengambil data, arahkan ke Login
-                    navController.navigate(Screen.Login.route) {
-                        popUpTo(Screen.Splash.route) { inclusive = true }
+                } else {
+                    try {
+                        // Ambil data peran dari Firestore menggunakan await() agar lebih bersih
+                        val uid = auth.currentUser!!.uid
+                        val document = Firebase.firestore.collection("users").document(uid).get().await()
+                        val userRole = document.getString("role")
+
+                        // Update FCM token di latar belakang (tidak perlu ditunggu)
+                        launch {
+                            try {
+                                val token = FirebaseMessaging.getInstance().token.await()
+                                FirebaseFirestore.getInstance().collection("users").document(uid)
+                                    .update("fcmToken", token)
+                            } catch (e: Exception) {
+                                Log.w("SplashScreen", "Gagal update FCM token", e)
+                            }
+                        }
+
+                        val destination = when (userRole) {
+                            "penumpang" -> Screen.PassengerMain.route
+                            "driver" -> Screen.DriverMain.route
+                            else -> Screen.Login.route
+                        }
+                        navController.navigate(destination) {
+                            popUpTo(Screen.Splash.route) { inclusive = true }
+                        }
+
+                    } catch (e: Exception) {
+                        // Jika gagal mengambil data, arahkan ke Login
+                        Log.e("SplashScreen", "Gagal mengambil data user", e)
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(Screen.Splash.route) { inclusive = true }
+                        }
                     }
                 }
+            }
         }
     }
 
-    // Tampilan saat loading
+    // Tampilan UI tetap sama
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        // Ganti dengan logo baru Anda
         Image(
-            painter = painterResource(id = R.drawable.apk_logo), // <-- GANTI DENGAN LOGO BARU ANDA
+            painter = painterResource(id = R.drawable.apk_logo),
             contentDescription = "App Logo",
-            modifier = Modifier.size(120.dp) // Sesuaikan ukurannya
+            modifier = Modifier.size(120.dp)
         )
     }
 }

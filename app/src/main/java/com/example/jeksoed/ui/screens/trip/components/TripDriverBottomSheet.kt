@@ -15,12 +15,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.jeksoed.data.model.User
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.jeksoed.R
 import com.example.jeksoed.data.model.RideRequest
 import com.example.jeksoed.ui.screens.trip.TripUiState
@@ -37,6 +40,7 @@ fun TripDriverBottomSheet(
 ) {
     var showCancelDialog by remember { mutableStateOf(false) }
     val rideRequest = uiState.rideRequest ?: return // Jangan render jika data belum ada
+    val passenger = uiState.otherUser
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -45,25 +49,31 @@ fun TripDriverBottomSheet(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             // --- Bagian Info Penumpang & Rute ---
-            PassengerInfo(onChatClick = onChatClick)
+            PassengerInfo(
+                passenger = passenger,
+                onChatClick = onChatClick
+            )
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-            RouteDisplay()
+            RouteDisplay(
+                pickupName = rideRequest.pickupName ?: "Lokasi Jemput",
+                destinationName = rideRequest.destinationName ?: "Lokasi Tujuan"
+            )
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
             // --- Bagian Aksi (berubah sesuai status) ---
             when (rideRequest.status) {
                 "accepted" -> StatusContent(
-                    totalPayment = formatCurrency(10000), // Ganti dengan harga asli
+                    totalPayment = rideRequest.price ?: "Rp0",
                     buttonText = "Geser jika sudah sampai",
                     onSlideConfirmed = { onUpdateStatus("arrived") }
                 )
                 "arrived" -> StatusContent(
-                    totalPayment = formatCurrency(10000), // Ganti dengan harga asli
+                    totalPayment = rideRequest.price ?: "Rp0",
                     buttonText = "Geser untuk memulai perjalanan",
                     onSlideConfirmed = { onUpdateStatus("started") }
                 )
                 "started" -> StatusContent(
-                    totalPayment = formatCurrency(10000), // Ganti dengan harga asli
+                    totalPayment = rideRequest.price ?: "Rp0",
                     buttonText = "Geser jika sudah sampai tujuan",
                     onSlideConfirmed = { onUpdateStatus("completed") }
                 )
@@ -96,21 +106,25 @@ fun TripDriverBottomSheet(
 // --- Komponen-komponen Kecil untuk Bottom Sheet ---
 
 @Composable
-private fun PassengerInfo(onChatClick: () -> Unit) {
+private fun PassengerInfo(passenger: User?, onChatClick: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Image(
-            painter = painterResource(id = R.drawable.person_icon),
+        AsyncImage(
+            model = passenger?.photoUrl,
             contentDescription = "Foto Penumpang",
+            placeholder = painterResource(id = R.drawable.person_icon),
+            error = painterResource(id = R.drawable.person_icon),
+            contentScale = ContentScale.Crop,
             modifier = Modifier.size(40.dp).clip(CircleShape)
         )
         Spacer(modifier = Modifier.width(12.dp))
         Text(
-            text = "Imedia Sholem", // Ganti dengan nama penumpang asli
+            text = passenger?.nama ?: "Memuat...", // Menampilkan nama penumpang dari data
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.weight(1f)
         )
-        IconButton(onClick = onChatClick,
+        IconButton(
+            onClick = onChatClick,
             colors = IconButtonDefaults.iconButtonColors(
                 containerColor = Color(0xFFFFC107)
             )
@@ -121,10 +135,10 @@ private fun PassengerInfo(onChatClick: () -> Unit) {
 }
 
 @Composable
-private fun RouteDisplay() {
+private fun RouteDisplay(pickupName: String, destinationName: String) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        RouteRow(iconRes = R.drawable.blue_icon, location = "FK Unsoed") // Ganti data asli
-        RouteRow(iconRes = R.drawable.locatio_icon, location = "Rumah Sakit Wiradadi") // Ganti data asli
+        RouteRow(iconRes = R.drawable.blue_icon, location = pickupName)
+        RouteRow(iconRes = R.drawable.locatio_icon, location = destinationName)
     }
 }
 
@@ -136,7 +150,6 @@ private fun RouteRow(iconRes: Int, location: String) {
         Text(text = location, fontSize = 14.sp)
     }
 }
-
 
 @Composable
 fun CancelTripDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
@@ -164,7 +177,7 @@ fun CancelTripDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
 private fun StatusContent(
     totalPayment: String,
     buttonText: String,
-    onSlideConfirmed: () -> Unit // Callback diubah namanya
+    onSlideConfirmed: () -> Unit
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Row(
