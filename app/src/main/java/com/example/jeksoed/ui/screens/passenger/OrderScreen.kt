@@ -32,9 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import com.example.jeksoed.R
-import com.example.jeksoed.ui.screens.passenger.components.OrderSheetContent
 import com.example.jeksoed.ui.theme.JekSoedTheme
 import com.example.jeksoed.utils.bitmapDescriptorFromVector
 import com.google.android.gms.location.LocationServices
@@ -45,20 +43,14 @@ import com.google.android.gms.maps.model.LatLngBounds
 import com.google.android.libraries.places.api.Places
 import com.google.maps.android.compose.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 import com.example.jeksoed.utils.bitmapDescriptorFromComposable
 import com.google.android.gms.maps.model.BitmapDescriptor
+import com.example.jeksoed.ui.screens.passenger.OrderStage
+import com.example.jeksoed.ui.screens.passenger.OrderUiState
+import com.example.jeksoed.ui.screens.passenger.OrderViewModel
+import com.example.jeksoed.ui.screens.passenger.components.OrderSheetContent
 
-/**
- * =================================================================================
- * 1. SMART COMPOSABLE (SCREEN-LEVEL)
- * =================================================================================
- * Tugasnya:
- * - Mengelola state dan ViewModel.
- * - Menangani semua logika (permintaan izin, lokasi, API key).
- * - Memanggil Dumb Composable (OrderScreenLayout) untuk menampilkan UI.
- */
-
+// Bagian TopRouteInfoBar dan RouteInfoRow tidak diubah, tetap sama.
 @Composable
 private fun TopRouteInfoBar(pickup: String, destination: String) {
     Card(
@@ -93,66 +85,56 @@ private fun RouteInfoRow(icon: Int, text: String) {
         Text(text = text, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun OrderScreen(
     navController: NavController,
-    orderViewModel: OrderViewModel = viewModel()
+    orderViewModel: OrderViewModel = viewModel() // Cukup satu instance ViewModel
 ) {
-    val context = LocalContext.current
     val uiState by orderViewModel.uiState.collectAsState()
-    val scope = rememberCoroutineScope()
-
-    var hasLocationPermission by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) }
-    val cameraPositionState = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(LatLng(-7.431, 109.245), 15f) }
+    val userLocation by orderViewModel.userLocation.collectAsState() // Ambil lokasi dari ViewModel
+    val cameraPositionState = rememberCameraPositionState()
     val bottomSheetState = rememberBottomSheetScaffoldState()
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val fusedLocationProviderClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
-    val expandSheet: () -> Unit = {
-        scope.launch {
-            bottomSheetState.bottomSheetState.expand()
-        }
+    // State untuk izin lokasi
+    var hasLocationPermission by remember {
+        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED)
     }
 
-    val placesClient = remember { Places.createClient(context) }
-    val apiKey = remember {
-        context.packageManager.getApplicationInfo(context.packageName, PackageManager.GET_META_DATA)
-            .metaData.getString("com.google.android.geo.API_KEY") ?: ""
-    }
-
+    // Launcher untuk meminta izin
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
         onResult = { isGranted -> hasLocationPermission = isGranted }
     )
 
-    val configuration = LocalConfiguration.current
-    val screenHeight = configuration.screenHeightDp.dp
+    // --- MENGELOLA LOGIKA LOKASI DAN KAMERA ---
 
-    val isKeyboardOpen by rememberUpdatedState(WindowInsets.isImeVisible)
-    LaunchedEffect(isKeyboardOpen) {
-        if (isKeyboardOpen) {
-            scope.launch {
-                bottomSheetState.bottomSheetState.expand()
-            }
-        }
-    }
-
-    LaunchedEffect(key1 = hasLocationPermission) {
+    // 1. Minta izin jika belum ada, lalu dapatkan lokasi awal
+    LaunchedEffect(hasLocationPermission) {
         if (hasLocationPermission) {
-            try {
-                val location = LocationServices.getFusedLocationProviderClient(context).lastLocation.await()
-                location?.let {
-                    val latLng = LatLng(it.latitude, it.longitude)
-                    orderViewModel.setUserLocationAsPickup(latLng)
-                    cameraPositionState.animate(CameraUpdateFactory.newCameraPosition(CameraPosition.fromLatLngZoom(latLng, 15f)))
-                }
-            } catch (e: Exception) { Log.e("OrderScreen", "Gagal mendapatkan lokasi", e) }
+            orderViewModel.getCurrentLocation(fusedLocationProviderClient)
         } else {
             permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
     }
 
+    // 2. Animasikan kamera ke lokasi pengguna saat pertama kali didapatkan
+    LaunchedEffect(userLocation) {
+        userLocation?.let {
+            cameraPositionState.animate(
+                update = CameraUpdateFactory.newLatLngZoom(it, 15f),
+                durationMs = 1000
+            )
+        }
+    }
+
+    // 3. Animasikan kamera untuk menunjukkan rute saat sudah ada
     LaunchedEffect(uiState.routeInfo) {
-        if (uiState.routeInfo != null) {
+        uiState.routeInfo?.let {
             val pickup = uiState.pickupLocation
             val destination = uiState.destinationLocation
             if (pickup != null && destination != null) {
@@ -162,6 +144,7 @@ fun OrderScreen(
         }
     }
 
+    // Navigasi ke TripScreen jika ada perjalanan aktif
     LaunchedEffect(Unit) {
         orderViewModel.listenToActiveRide { rideId ->
             navController.navigate("trip/$rideId") {
@@ -170,9 +153,22 @@ fun OrderScreen(
         }
     }
 
-    // Memanggil Dumb Composable untuk menampilkan UI
+    // Aksi untuk membuka bottom sheet
+    val expandSheet: () -> Unit = { scope.launch { bottomSheetState.bottomSheetState.expand() } }
+
+    val placesClient = remember { Places.createClient(context) }
+    val apiKey = remember {
+        context.packageManager.getApplicationInfo(context.packageName, PackageManager.GET_META_DATA)
+            .metaData.getString("com.google.android.geo.API_KEY") ?: ""
+    }
+
+    val configuration = LocalConfiguration.current
+    val screenHeight = configuration.screenHeightDp.dp
+
+    // Menampilkan UI menggunakan Dumb Composable
     OrderScreenLayout(
         uiState = uiState,
+        userLocation = userLocation, // Kirim lokasi user ke layout
         cameraPositionState = cameraPositionState,
         bottomSheetState = bottomSheetState,
         sheetPeekHeight = when (uiState.stage) {
@@ -181,7 +177,6 @@ fun OrderScreen(
             OrderStage.ROUTE_CONFIRM -> screenHeight * 0.5f
             OrderStage.FINDING_DRIVER -> 300.dp
         },
-        // Tentukan aksi berdasarkan stage saat ini
         onBackClick = {
             if (uiState.stage == OrderStage.ROUTE_CONFIRM || uiState.stage == OrderStage.PICKUP_CONFIRM) {
                 orderViewModel.goBackToSearch()
@@ -201,19 +196,11 @@ fun OrderScreen(
     )
 }
 
-/**
- * =================================================================================
- * 2. DUMB COMPOSABLE (UI-ONLY)
- * =================================================================================
- * Tugasnya:
- * - Hanya menampilkan UI berdasarkan parameter yang diberikan.
- * - Tidak tahu-menahu tentang ViewModel atau logika bisnis.
- * - Mudah untuk di-preview.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun OrderScreenLayout(
     uiState: OrderUiState,
+    userLocation: LatLng?, // Terima lokasi user
     cameraPositionState: CameraPositionState,
     bottomSheetState: BottomSheetScaffoldState,
     sheetPeekHeight: Dp,
@@ -223,13 +210,11 @@ private fun OrderScreenLayout(
     val context = LocalContext.current
     var pickupMarker by remember { mutableStateOf<BitmapDescriptor?>(null) }
 
-    // --- BUAT MARKER SECARA ASYNC SAAT KOMPOSISI ---
     LaunchedEffect(Unit) {
         pickupMarker = bitmapDescriptorFromComposable(context) {
             PickupMarkerComposable()
         }
     }
-
 
     BottomSheetScaffold(
         scaffoldState = bottomSheetState,
@@ -237,18 +222,27 @@ private fun OrderScreenLayout(
         sheetShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
         sheetContent = sheetContent
     ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)
-        ) {
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             GoogleMap(
-                modifier = Modifier.fillMaxSize().then( // Gunakan .then untuk menambahkan modifier secara kondisional
-                    if (uiState.stage == OrderStage.FINDING_DRIVER)
-                        Modifier.blur(radius = 8.dp)
-                    else
-                        Modifier),
+                modifier = Modifier.fillMaxSize().then(
+                    if (uiState.stage == OrderStage.FINDING_DRIVER) Modifier.blur(radius = 8.dp)
+                    else Modifier
+                ),
                 cameraPositionState = cameraPositionState,
                 uiSettings = MapUiSettings(zoomControlsEnabled = false)
             ) {
-                // --- GUNAKAN MARKER KUSTOM ---
+                // PERBAIKAN: Tampilkan marker lokasi user saat pencarian
+                if (uiState.stage == OrderStage.SEARCHING) {
+                    userLocation?.let {
+                        Marker(
+                            state = MarkerState(position = it),
+                            title = "Lokasi Anda"
+                            // Anda bisa menambahkan ikon kustom di sini jika mau
+                        )
+                    }
+                }
+
+                // Marker untuk lokasi jemput (setelah dipilih)
                 if (pickupMarker != null) {
                     uiState.pickupLocation?.let {
                         Marker(
@@ -259,16 +253,15 @@ private fun OrderScreenLayout(
                     }
                 }
 
-                // --- MARKER TUJUAN (BAWAAN) ---
+                // Marker tujuan
                 uiState.destinationLocation?.let {
                     Marker(
                         state = MarkerState(position = it),
                         title = "Lokasi Tujuan"
-                        // Tidak ada 'icon', jadi pakai default
                     )
                 }
 
-                // --- TAMBAHKAN MARKER DRIVER ---
+                // Marker driver di sekitar
                 uiState.driverLocations.forEach { driverLatLng ->
                     Marker(
                         state = MarkerState(position = driverLatLng),
@@ -276,10 +269,14 @@ private fun OrderScreenLayout(
                         icon = bitmapDescriptorFromVector(context, R.drawable.motor_icon)
                     )
                 }
+
+                // PERBAIKAN: Polyline akan otomatis tampil saat routeInfo ada
+                // Ini berlaku untuk stage PICKUP_CONFIRM dan ROUTE_CONFIRM
                 uiState.routeInfo?.let {
                     Polyline(points = it.polylinePoints, color = MaterialTheme.colorScheme.primary, width = 15f)
                 }
             }
+
             if (uiState.stage == OrderStage.ROUTE_CONFIRM || uiState.stage == OrderStage.FINDING_DRIVER) {
                 TopRouteInfoBar(
                     pickup = uiState.pickupQuery,
@@ -287,9 +284,7 @@ private fun OrderScreenLayout(
                 )
             }
 
-            // Aturan untuk tombol kembali
             if (uiState.stage == OrderStage.ROUTE_CONFIRM) {
-                // Tombol kembali di atas sheet untuk RouteConfirm
                 IconButton(
                     onClick = onBackClick,
                     modifier = Modifier
@@ -301,7 +296,6 @@ private fun OrderScreenLayout(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
                 }
             } else if (uiState.stage != OrderStage.FINDING_DRIVER) {
-                // Tombol kembali di atas untuk semua stage lain, KECUALI FindingDriver
                 IconButton(
                     onClick = onBackClick,
                     modifier = Modifier
@@ -316,35 +310,32 @@ private fun OrderScreenLayout(
         }
     }
 }
+
+// Composable PickupMarkerComposable dan Preview tidak diubah, tetap sama.
 @Composable
 fun PickupMarkerComposable() {
     Box(
         modifier = Modifier.wrapContentSize(),
         contentAlignment = Alignment.TopCenter
     ) {
-        // Lingkaran luar (border transparan) dan dalam (biru)
         Box(
             modifier = Modifier
-                .padding(top = 10.dp) // Beri ruang untuk foto profil
+                .padding(top = 10.dp)
                 .size(70.dp)
                 .clip(CircleShape)
                 .background(Color.White.copy(alpha = 0.5f))
                 .padding(4.dp)
                 .clip(CircleShape)
-                .background(Color(0xFF3386FF)) // Warna biru
+                .background(Color(0xFF3386FF))
         )
-
-        // Foto Profil
         Image(
-            painter = painterResource(id = R.drawable.person_icon), // Ganti dengan gambar profil asli jika ada
+            painter = painterResource(id = R.drawable.person_icon),
             contentDescription = "Profil",
             modifier = Modifier
                 .size(50.dp)
                 .clip(CircleShape)
                 .border(3.dp, Color.White, CircleShape)
         )
-
-        // Segitiga Pin di bawah
         Canvas(modifier = Modifier
             .size(20.dp, 10.dp)
             .align(Alignment.BottomCenter)
@@ -360,33 +351,24 @@ fun PickupMarkerComposable() {
         }
     }
 }
-/**
- * =================================================================================
- * 3. PREVIEW
- * =================================================================================
- * Tugasnya:
- * - Memanggil Dumb Composable (OrderScreenLayout) dengan data palsu.
- * - Tidak akan crash karena tidak menginisialisasi komponen runtime.
- */
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 fun OrderScreenPreview() {
     JekSoedTheme {
-        // Siapkan data dan state palsu untuk preview
         val dummyUiState = OrderUiState(stage = OrderStage.SEARCHING)
         val cameraPositionState = rememberCameraPositionState()
         val bottomSheetState = rememberBottomSheetScaffoldState()
 
-        // Panggil OrderScreenLayout yang hanya butuh data, bukan ViewModel
         OrderScreenLayout(
             uiState = dummyUiState,
+            userLocation = LatLng(0.0, 0.0), // Beri lokasi dummy untuk preview
             cameraPositionState = cameraPositionState,
             bottomSheetState = bottomSheetState,
-            sheetPeekHeight = 400.dp, // Tinggi tetap untuk preview
+            sheetPeekHeight = 400.dp,
             onBackClick = {},
             sheetContent = {
-                // Tampilkan placeholder sederhana untuk konten sheet
                 Box(modifier = Modifier.fillMaxWidth().height(400.dp), contentAlignment = Alignment.Center) {
                     Text("Bottom Sheet Content Preview")
                 }

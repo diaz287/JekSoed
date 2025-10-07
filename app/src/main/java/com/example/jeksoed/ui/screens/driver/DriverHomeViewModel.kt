@@ -1,10 +1,18 @@
 package com.example.jeksoed.ui.screens.driver
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Looper
 import android.util.Log
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.jeksoed.data.model.RideRequest
 import com.example.jeksoed.data.model.User
+import com.example.jeksoed.data.remote.MapsApiService // Import service
+import com.google.android.gms.location.*
+import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -17,6 +25,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.text.DecimalFormat
 
+// DriverProfile tidak berubah
 data class DriverProfile(
     val name: String = "Memuat...",
     val licensePlate: String = "...",
@@ -26,13 +35,15 @@ data class DriverProfile(
     val orderCount: String = "0"
 )
 
+
 data class DriverHomeUiState(
     val isOnline: Boolean = true,
     val rideRequests: List<RideRequest> = emptyList(),
     val popupRideRequest: RideRequest? = null,
     val driverProfile: DriverProfile = DriverProfile(),
     val isLoadingProfile: Boolean = true,
-    val acceptingRideId: String? = null
+    val acceptingRideId: String? = null,
+    val driverLocation: LatLng? = null // State untuk lokasi real-time driver
 )
 
 class DriverHomeViewModel : ViewModel() {
@@ -40,6 +51,8 @@ class DriverHomeViewModel : ViewModel() {
     private val firestore = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
     private var rideRequestListener: ListenerRegistration? = null
+    private val mapsApiService = MapsApiService.create() // Inisialisasi service
+    private var locationCallback: LocationCallback? = null // Callback untuk update lokasi
 
     private val _uiState = MutableStateFlow(DriverHomeUiState())
     val uiState = _uiState.asStateFlow()
@@ -49,18 +62,88 @@ class DriverHomeViewModel : ViewModel() {
         listenToRideRequests()
     }
 
+    fun startLocationUpdates(fusedLocationClient: FusedLocationProviderClient, context: Context) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return
+        }
+
+        val locationRequest = LocationRequest.create().apply {
+            interval = 10000 // Update setiap 10 detik
+            fastestInterval = 5000
+            priority = LocationRequest.PRIORITY_HIGH_ACCURACY
+        }
+
+        locationCallback = object : LocationCallback() {
+            override fun onLocationResult(locationResult: LocationResult) {
+                locationResult.lastLocation?.let { location ->
+                    val newLatLng = LatLng(location.latitude, location.longitude)
+                    _uiState.update { it.copy(driverLocation = newLatLng) }
+                }
+            }
+        }
+
+        fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback!!, Looper.getMainLooper())
+    }
+
+    fun stopLocationUpdates(fusedLocationClient: FusedLocationProviderClient) {
+        locationCallback?.let {
+            fusedLocationClient.removeLocationUpdates(it)
+        }
+    }
+
+    // Fungsi acceptRide diubah untuk mengambil rute
+    fun acceptRide(rideRequest: RideRequest, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
+        val driverId = auth.currentUser?.uid ?: return onFailure(Exception("Driver tidak login"))
+        val driverLocation = _uiState.value.driverLocation ?: return onFailure(Exception("Lokasi driver tidak ditemukan"))
+
+        _uiState.update { it.copy(acceptingRideId = rideRequest.id, popupRideRequest = null) }
+
+        viewModelScope.launch {
+            try {
+                val passengerLocation = LatLng(
+                    rideRequest.pickupLocation["latitude"] ?: 0.0,
+                    rideRequest.pickupLocation["longitude"] ?: 0.0
+                )
+                // Panggil API untuk mendapatkan rute
+                val result = mapsApiService.getDirections(driverLocation, passengerLocation)
+                val points = result.routes.firstOrNull()?.overviewPolyline?.points ?: ""
+
+                // Update status dan rute di Firestore
+                firestore.collection("ride_requests").document(rideRequest.id)
+                    .update(
+                        mapOf(
+                            "status" to "accepted",
+                            "driverId" to driverId,
+                            "encodedPolyline" to points // Simpan rute baru dari driver ke penumpang
+                        )
+                    )
+                    .addOnSuccessListener {
+                        _uiState.update { it.copy(acceptingRideId = null) }
+                        onSuccess()
+                    }
+                    .addOnFailureListener { e ->
+                        _uiState.update { it.copy(acceptingRideId = null) }
+                        onFailure(e)
+                    }
+
+            } catch (e: Exception) {
+                Log.e("DriverHomeVM", "Gagal mendapatkan rute atau update", e)
+                _uiState.update { it.copy(acceptingRideId = null) }
+                onFailure(e)
+            }
+        }
+    }
+
+    // Sisa ViewModel tidak berubah...
     private fun loadDriverProfile() {
         val userId = auth.currentUser?.uid ?: return
         _uiState.update { it.copy(isLoadingProfile = true) }
 
         viewModelScope.launch {
             try {
-                // 1. Ambil data dokumen pengguna
                 val userDocument = firestore.collection("users").document(userId).get().await()
                 val user = userDocument.toObject<User>() ?: User()
 
-                // --- PERUBAHAN LOGIKA UTAMA DI SINI ---
-                // 2. Hitung rata-rata rating dari field yang ada
                 val averageRating = if (user.ratingCount > 0) {
                     val avg = user.totalRating.toDouble() / user.ratingCount.toDouble()
                     DecimalFormat("#.#").format(avg)
@@ -68,7 +151,6 @@ class DriverHomeViewModel : ViewModel() {
                     "0.0"
                 }
 
-                // 3. Hitung jumlah orderan yang selesai
                 val completedOrdersQuery = firestore.collection("ride_requests")
                     .whereEqualTo("driverId", userId)
                     .whereEqualTo("status", "completed")
@@ -76,16 +158,15 @@ class DriverHomeViewModel : ViewModel() {
                     .await()
                 val orderCount = completedOrdersQuery.size().toString()
 
-                // 4. Update UI dengan semua data
                 _uiState.update {
                     it.copy(
                         driverProfile = DriverProfile(
                             name = user.nama,
                             licensePlate = user.licensePlate ?: "Belum diatur",
                             photoUrl = user.photoUrl,
-                            balance = "Rp150.000,-", // Ganti dengan data asli jika ada
-                            rating = averageRating,      // Data rating dari field user
-                            orderCount = orderCount      // Data orderan dari query
+                            balance = "Rp150.000,-",
+                            rating = averageRating,
+                            orderCount = orderCount
                         ),
                         isLoadingProfile = false
                     )
@@ -95,10 +176,6 @@ class DriverHomeViewModel : ViewModel() {
                 _uiState.update { it.copy(isLoadingProfile = false) }
             }
         }
-    }
-
-    fun setOnlineStatus(isOnline: Boolean) {
-        _uiState.update { it.copy(isOnline = isOnline) }
     }
 
     private fun listenToRideRequests() {
@@ -111,39 +188,16 @@ class DriverHomeViewModel : ViewModel() {
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
-                    val currentRequests = _uiState.value.rideRequests
                     val newRequests = snapshot.documents.mapNotNull { doc ->
                         doc.toObject(RideRequest::class.java)?.copy(id = doc.id)
                     }
-                    val newTopRequest = newRequests.firstOrNull()
-                    val oldTopRequest = currentRequests.firstOrNull()
-                    val shouldShowPopup = newTopRequest != null && newTopRequest.id != oldTopRequest?.id
                     _uiState.update {
                         it.copy(
                             rideRequests = newRequests,
-                            popupRideRequest = if (shouldShowPopup) newTopRequest else it.popupRideRequest
+                            popupRideRequest = newRequests.firstOrNull()
                         )
                     }
                 }
-            }
-    }
-
-    fun acceptRide(rideId: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
-        val driverId = auth.currentUser?.uid
-        if (driverId == null) {
-            onFailure(Exception("Driver tidak login"))
-            return
-        }
-        _uiState.update { it.copy(acceptingRideId = rideId, popupRideRequest = null) }
-        firestore.collection("ride_requests").document(rideId)
-            .update(mapOf("status" to "accepted", "driverId" to driverId))
-            .addOnSuccessListener {
-                _uiState.update { it.copy(acceptingRideId = null) }
-                onSuccess()
-            }
-            .addOnFailureListener { e ->
-                _uiState.update { it.copy(acceptingRideId = null) }
-                onFailure(e)
             }
     }
 
@@ -153,6 +207,10 @@ class DriverHomeViewModel : ViewModel() {
 
     fun dismissPopup() {
         _uiState.update { it.copy(popupRideRequest = null) }
+    }
+
+    fun setOnlineStatus(isOnline: Boolean) {
+        _uiState.update { it.copy(isOnline = isOnline) }
     }
 
     fun logout() {

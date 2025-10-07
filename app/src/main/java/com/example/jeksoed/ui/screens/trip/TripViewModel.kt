@@ -10,6 +10,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.jeksoed.data.model.RideRequest
 import com.example.jeksoed.data.model.User
+import com.example.jeksoed.data.remote.MapsApiService // Import service
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
@@ -36,7 +37,7 @@ sealed class TripNavEvent {
 
 data class TripUiState(
     val rideRequest: RideRequest? = null,
-    val polylinePoints: List<LatLng> = emptyList(),
+    val dynamicPolylinePoints: List<LatLng> = emptyList(), // State untuk rute dinamis
     val isDriver: Boolean = false,
     val otherUser: User? = null
 )
@@ -44,7 +45,8 @@ data class TripUiState(
 class TripViewModel(
     private val rideRequestId: String,
     private val db: FirebaseFirestore,
-    private val auth: FirebaseAuth
+    private val auth: FirebaseAuth,
+    private val mapsApiService: MapsApiService = MapsApiService.create()
 ) : ViewModel() {
 
     private val currentUserId = auth.currentUser?.uid
@@ -74,13 +76,10 @@ class TripViewModel(
                     val request = snapshot.toObject(RideRequest::class.java)?.copy(id = snapshot.id)
                     val isDriver = request?.driverId == currentUserId
 
-                    _uiState.update {
-                        it.copy(
-                            rideRequest = request,
-                            isDriver = isDriver,
-                            polylinePoints = request?.encodedPolyline?.let { PolyUtil.decode(it) } ?: emptyList()
-                        )
-                    }
+                    _uiState.update { it.copy(rideRequest = request, isDriver = isDriver) }
+
+                    // Panggil fungsi untuk update rute setiap ada perubahan data
+                    updateRouteBasedOnStatus()
 
                     loadOtherUserInfo(isDriver, request)
 
@@ -93,6 +92,54 @@ class TripViewModel(
             }
     }
 
+    // FUNGSI INTI: Secara dinamis menentukan dan mengambil rute berdasarkan status.
+    private fun updateRouteBasedOnStatus() {
+        viewModelScope.launch {
+            val request = _uiState.value.rideRequest ?: return@launch
+
+            val driverLocation = request.driverCurrentLocation?.let { LatLng(it["latitude"] ?: 0.0, it["longitude"] ?: 0.0) }
+            val pickupLocation = LatLng(request.pickupLocation["latitude"] ?: 0.0, request.pickupLocation["longitude"] ?: 0.0)
+            val destinationLocation = LatLng(request.destinationLocation["latitude"] ?: 0.0, request.destinationLocation["longitude"] ?: 0.0)
+
+            val origin: LatLng?
+            val destination: LatLng?
+
+            when (request.status) {
+                // Status: Driver menuju lokasi penumpang
+                "accepted", "arrived" -> {
+                    origin = driverLocation
+                    destination = pickupLocation
+                }
+                // Status: Penumpang sudah dijemput, menuju tujuan
+                "started" -> {
+                    origin = driverLocation // Lokasi driver sekarang = lokasi penumpang
+                    destination = destinationLocation
+                }
+                // Status lain (fallback)
+                else -> {
+                    origin = null
+                    destination = null
+                }
+            }
+
+            // Panggil Directions API jika origin dan destination valid
+            if (origin != null && destination != null) {
+                try {
+                    val result = mapsApiService.getDirections(origin, destination)
+                    val points = result.routes.firstOrNull()?.overviewPolyline?.points
+                    if (points != null) {
+                        _uiState.update { it.copy(dynamicPolylinePoints = PolyUtil.decode(points)) }
+                    }
+                } catch (e: Exception) {
+                    Log.e("TripViewModel", "Failed to get directions", e)
+                }
+            } else {
+                _uiState.update { it.copy(dynamicPolylinePoints = emptyList()) }
+            }
+        }
+    }
+
+    // Sisa ViewModel tidak berubah...
     private fun loadOtherUserInfo(isDriver: Boolean, rideRequest: RideRequest?) {
         viewModelScope.launch {
             if (rideRequest == null) return@launch

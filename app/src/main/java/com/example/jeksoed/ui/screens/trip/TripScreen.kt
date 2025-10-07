@@ -33,9 +33,12 @@ import androidx.compose.animation.slideOutVertically
 import com.example.jeksoed.ui.screens.trip.components.PaymentConfirmationCard
 import com.example.jeksoed.ui.screens.trip.components.TripDriverBottomSheet
 import com.example.jeksoed.ui.screens.trip.components.TripPassengerSheet
+import com.example.jeksoed.utils.bitmapDescriptorFromVector
 import com.example.jeksoed.utils.formatCurrency
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.example.jeksoed.R
 
 // Composable "Pintar" yang terhubung ke ViewModel
 @Composable
@@ -116,47 +119,50 @@ fun TripScreenLayout(
     onChatClick: (rideId: String) -> Unit,
     onBackClick: () -> Unit
 ) {
-    // Efek untuk menyesuaikan kamera (tidak berubah)
-    LaunchedEffect(uiState.polylinePoints) {
-        if (uiState.polylinePoints.isNotEmpty()) {
-            val bounds = LatLngBounds.builder()
-            uiState.polylinePoints.forEach { bounds.include(it) }
+    val context = LocalContext.current // Dapatkan context untuk marker
+
+    // Efek untuk menyesuaikan kamera
+    LaunchedEffect(uiState.dynamicPolylinePoints) { // PERUBAHAN: Bereaksi terhadap polyline dinamis
+        if (uiState.dynamicPolylinePoints.isNotEmpty()) {
+            val boundsBuilder = LatLngBounds.builder()
+            uiState.dynamicPolylinePoints.forEach { boundsBuilder.include(it) }
+            // Juga masukkan lokasi tujuan agar selalu terlihat
+            uiState.rideRequest?.destinationLocation?.let {
+                boundsBuilder.include(LatLng(it["latitude"] ?: 0.0, it["longitude"] ?: 0.0))
+            }
             cameraPositionState.animate(
-                com.google.android.gms.maps.CameraUpdateFactory.newLatLngBounds(bounds.build(), 150)
+                CameraUpdateFactory.newLatLngBounds(boundsBuilder.build(), 150)
             )
         }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // --- PETA SEBAGAI LATAR BELAKANG ---
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState
         ) {
-            // Polyline, Marker Jemput, Tujuan, dan Driver (tidak berubah)
-            if (uiState.polylinePoints.isNotEmpty()) {
-                Polyline(points = uiState.polylinePoints, color = MaterialTheme.colorScheme.primary, width = 15f)
+            // PERBAIKAN: Gunakan dynamicPolylinePoints untuk menggambar rute
+            if (uiState.dynamicPolylinePoints.isNotEmpty()) {
+                Polyline(points = uiState.dynamicPolylinePoints, color = MaterialTheme.colorScheme.primary, width = 15f)
             }
 
             uiState.rideRequest?.let { request ->
-                val pickupLatLng = LatLng(
-                    request.pickupLocation["latitude"] ?: 0.0,
-                    request.pickupLocation["longitude"] ?: 0.0
-                )
+                // Marker Lokasi Jemput
+                val pickupLatLng = LatLng(request.pickupLocation["latitude"] ?: 0.0, request.pickupLocation["longitude"] ?: 0.0)
                 Marker(state = MarkerState(position = pickupLatLng), title = "Jemput")
 
-                val destLatLng = LatLng(
-                    request.destinationLocation["latitude"] ?: 0.0,
-                    request.destinationLocation["longitude"] ?: 0.0
-                )
+                // Marker Lokasi Tujuan (selalu ditampilkan)
+                val destLatLng = LatLng(request.destinationLocation["latitude"] ?: 0.0, request.destinationLocation["longitude"] ?: 0.0)
                 Marker(state = MarkerState(position = destLatLng), title = "Tujuan")
 
+                // Marker Lokasi Driver
                 request.driverCurrentLocation?.let {
                     val driverLatLng = LatLng(it["latitude"] ?: 0.0, it["longitude"] ?: 0.0)
                     Marker(
                         state = MarkerState(position = driverLatLng),
                         title = "Driver",
-                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
+                        // Menggunakan ikon motor dari drawable
+                        icon = bitmapDescriptorFromVector(context, R.drawable.motor_icon)
                     )
                 }
             }

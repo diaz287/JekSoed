@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.jeksoed.data.model.RouteInfo
 import com.example.jeksoed.utils.calculatePrice
 import com.example.jeksoed.utils.formatCurrency
+import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.libraries.places.api.model.AutocompletePrediction
 import com.google.android.libraries.places.api.model.Place
@@ -60,6 +61,22 @@ data class OrderUiState(
 )
 
 class OrderViewModel : ViewModel() {
+    private val _userLocation = MutableStateFlow<LatLng?>(null)
+    val userLocation: StateFlow<LatLng?> = _userLocation
+
+    // Panggil fungsi ini dari UI untuk memulai pengambilan lokasi
+    fun getCurrentLocation(fusedLocationProviderClient: FusedLocationProviderClient) {
+        try {
+            // Pastikan Anda sudah handle permission check di UI
+            fusedLocationProviderClient.lastLocation.addOnSuccessListener { location ->
+                if (location != null) {
+                    _userLocation.value = LatLng(location.latitude, location.longitude)
+                }
+            }
+        } catch (e: SecurityException) {
+            // Handle exception, misal log atau tampilkan pesan error
+        }
+    }
 
     private val _uiState = MutableStateFlow(OrderUiState())
     val uiState = _uiState.asStateFlow()
@@ -299,3 +316,4 @@ class OrderViewModel : ViewModel() {
     }
 
 }
+

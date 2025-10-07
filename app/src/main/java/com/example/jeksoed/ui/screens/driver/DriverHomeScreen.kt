@@ -1,6 +1,9 @@
 package com.example.jeksoed.ui.screens.driver
 
+import android.Manifest
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -39,30 +42,61 @@ import com.example.jeksoed.R
 import com.example.jeksoed.navigation.Screen
 import com.example.jeksoed.ui.screens.driver.components.RideRequestPopup
 import com.example.jeksoed.ui.theme.JekSoedTheme
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.MarkerState
-import com.google.maps.android.compose.rememberCameraPositionState
+import com.google.maps.android.compose.*
 import kotlinx.coroutines.delay
 
 @Composable
-fun DriverHomeScreen(navController: NavController,viewModel: DriverHomeViewModel = viewModel()) {
+fun DriverHomeScreen(navController: NavController, viewModel: DriverHomeViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    var isOnline by remember { mutableStateOf(true) }
     var showOfflineDialog by remember { mutableStateOf(false) }
 
-    val unsoedLocation = LatLng(-7.431, 109.245)
-    val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(unsoedLocation, 15f)
+    val cameraPositionState = rememberCameraPositionState()
+    val driverLocation = uiState.driverLocation
+
+    // Launcher untuk meminta izin lokasi
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { isGranted ->
+            if (isGranted) {
+                // Izin diberikan, logika akan berjalan di DisposableEffect
+            } else {
+                Toast.makeText(context, "Izin lokasi dibutuhkan untuk fitur ini", Toast.LENGTH_SHORT).show()
+            }
+        }
+    )
+
+    // Efek untuk menggerakkan kamera
+    LaunchedEffect(driverLocation) {
+        driverLocation?.let {
+            cameraPositionState.animate(
+                update = CameraUpdateFactory.newLatLngZoom(it, 15f),
+                durationMs = 1000
+            )
+        }
+    }
+
+    // Mengelola siklus hidup pembaruan lokasi
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+    DisposableEffect(Unit) {
+        // Minta izin terlebih dahulu
+        permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        // Mulai update lokasi
+        viewModel.startLocationUpdates(fusedLocationClient, context)
+        // Hentikan saat composable hilang
+        onDispose {
+            viewModel.stopLocationUpdates(fusedLocationClient)
+        }
     }
 
     LaunchedEffect(uiState.popupRideRequest) {
         if (uiState.popupRideRequest != null) {
-            delay(3000) // Tunggu 3 detik
-            viewModel.dismissPopup() // Hilangkan pop-up
+            delay(30000) // Waktu tunggu orderan
+            viewModel.dismissPopup()
         }
     }
 
@@ -70,7 +104,7 @@ fun DriverHomeScreen(navController: NavController,viewModel: DriverHomeViewModel
         OfflineConfirmationDialog(
             onDismiss = { showOfflineDialog = false },
             onConfirm = {
-                isOnline = false
+                viewModel.setOnlineStatus(false)
                 showOfflineDialog = false
             }
         )
@@ -80,24 +114,19 @@ fun DriverHomeScreen(navController: NavController,viewModel: DriverHomeViewModel
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState,
-            uiSettings = com.google.maps.android.compose.MapUiSettings(zoomControlsEnabled = false)
+            uiSettings = MapUiSettings(zoomControlsEnabled = false)
         ) {
-            Marker(
-                state = MarkerState(position = unsoedLocation),
-                title = "Lokasi Anda"
-            )
-        }
-
-        if (uiState.rideRequests.isNotEmpty() && !isOnline) {
-            LazyColumn(modifier = Modifier.align(Alignment.Center).fillMaxHeight(0.4f).background(Color.White)) {
-                items(uiState.rideRequests) { request ->
-                    Text("Pesanan dari: ${request.passengerId} - Status: ${request.status}", modifier = Modifier.padding(16.dp))
-                }
+            // Tampilkan marker di lokasi driver
+            driverLocation?.let {
+                Marker(
+                    state = MarkerState(position = it),
+                    title = "Lokasi Anda"
+                )
             }
         }
 
         StatusIndicator(
-            isOnline = isOnline,
+            isOnline = uiState.isOnline,
             modifier = Modifier.align(Alignment.TopCenter)
         )
 
@@ -111,18 +140,17 @@ fun DriverHomeScreen(navController: NavController,viewModel: DriverHomeViewModel
         )
 
         DriverInfoCard(
-            uiState = uiState, // Mengirim seluruh UiState
+            uiState = uiState,
             onToggleStatus = {
                 if (uiState.isOnline) {
-                    showOfflineDialog = true // Tampilkan dialog jika sedang online
+                    showOfflineDialog = true
                 } else {
-                    viewModel.setOnlineStatus(true) // Langsung online jika sedang offline
+                    viewModel.setOnlineStatus(true)
                 }
             },
             modifier = Modifier.align(Alignment.BottomCenter)
         )
 
-        // --- POP-UP NOTIFIKASI ---
         AnimatedVisibility(
             visible = uiState.popupRideRequest != null,
             enter = fadeIn(),
@@ -132,14 +160,14 @@ fun DriverHomeScreen(navController: NavController,viewModel: DriverHomeViewModel
             uiState.popupRideRequest?.let { request ->
                 RideRequestPopup(
                     rideRequest = request,
-                    onAccept = { rideId ->
+                    onAccept = {
                         viewModel.acceptRide(
-                            rideId = rideId,
+                            rideRequest = request,
                             onSuccess = {
-                                navController.navigate(Screen.Trip.createRoute(rideId))
+                                navController.navigate(Screen.Trip.createRoute(request.id))
                             },
                             onFailure = { error ->
-                                Toast.makeText(context, "Gagal: ${error.message}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Gagal menerima: ${error.message}", Toast.LENGTH_SHORT).show()
                             }
                         )
                     },
@@ -158,7 +186,7 @@ private fun StatusIndicator(isOnline: Boolean, modifier: Modifier = Modifier) {
     val textColor = if (isOnline) Color.Black else Color.Gray
 
     Card(
-        modifier = modifier.offset(y=24.dp),
+        modifier = modifier.offset(y = 24.dp),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = backgroundColor)
     ) {
@@ -185,7 +213,7 @@ private fun NotificationButton(onNotificationClick: () -> Unit, modifier: Modifi
 
 @Composable
 private fun DriverInfoCard(
-    uiState: DriverHomeUiState, // Menerima UiState
+    uiState: DriverHomeUiState,
     onToggleStatus: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -331,70 +359,6 @@ private fun OfflineConfirmationDialog(onDismiss: () -> Unit, onConfirm: () -> Un
                     Text("Tetap Online", color = Color.Black)
                 }
             }
-        }
-    }
-}
-
-@Preview(showBackground = true, showSystemUi = true, name = "Halaman Home Driver")
-@Composable
-private fun DriverHomeScreenPreview() {
-    JekSoedTheme {
-        DriverHomeScreen(navController = rememberNavController())
-    }
-}
-
-@Preview(name = "Info Card (Online)")
-@Composable
-private fun DriverInfoCardOnlinePreview() {
-    JekSoedTheme {
-        val dummyUiState = DriverHomeUiState(
-            isOnline = true,
-            driverProfile = DriverProfile(
-                name = "Diaz",
-                licensePlate = "B 1234 ABC",
-                photoUrl = null,
-                balance = "Rp150.000,-",
-                rating = "4.9",
-                orderCount = "10"
-            )
-        )
-        DriverInfoCard(
-            uiState = dummyUiState,
-            onToggleStatus = {}
-        )
-    }
-}
-@Preview(name = "Info Card (Offline)")
-@Composable
-private fun DriverInfoCardOfflinePreview() {
-    JekSoedTheme {
-        val dummyUiState = DriverHomeUiState(
-            isOnline = true,
-            driverProfile = DriverProfile(
-                name = "Diaz",
-                licensePlate = "B 1234 ABC",
-                photoUrl = null,
-                balance = "Rp150.000,-",
-                rating = "4.9",
-                orderCount = "10"
-            )
-        )
-        DriverInfoCard(
-            uiState = dummyUiState,
-            onToggleStatus = {}
-        )
-    }
-}
-
-@Preview(name = "Dialog Konfirmasi Offline", showBackground = true)
-@Composable
-private fun OfflineConfirmationDialogPreview() {
-    JekSoedTheme {
-        Card(
-            modifier = Modifier.padding(16.dp),
-            shape = RoundedCornerShape(24.dp)
-        ) {
-            // Preview kontennya, bukan AlertDialog-nya
         }
     }
 }
