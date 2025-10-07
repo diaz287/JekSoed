@@ -56,17 +56,17 @@ fun TripDriverBottomSheet(
                 "accepted" -> StatusContent(
                     totalPayment = rideRequest.price ?: "Rp0",
                     buttonText = "Sudah sampai di lokasi jemput",
-                    onConfirm = { onUpdateStatus("arrived") }
+                    onSlideConfirmed = { onUpdateStatus("arrived") }
                 )
                 "arrived" -> StatusContent(
                     totalPayment = rideRequest.price ?: "Rp0",
                     buttonText = "Mulai Perjalanan",
-                    onConfirm = { onUpdateStatus("started") }
+                    onSlideConfirmed = { onUpdateStatus("started") }
                 )
                 "started" -> StatusContent(
                     totalPayment = rideRequest.price ?: "Rp0",
                     buttonText = "Selesaikan Perjalanan",
-                    onConfirm = { onUpdateStatus("completed") }
+                    onSlideConfirmed = { onUpdateStatus("completed") }
                 )
             }
             if (rideRequest.status != "completed") {
@@ -146,7 +146,7 @@ private fun RouteRow(iconRes: Int, location: String) {
 private fun StatusContent(
     totalPayment: String,
     buttonText: String,
-    onConfirm: () -> Unit
+    onSlideConfirmed: () -> Unit
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Row(
@@ -158,14 +158,10 @@ private fun StatusContent(
         }
         Spacer(modifier = Modifier.height(16.dp))
 
-        // --- PERBAIKAN: Mengganti SlideToConfirmButton dengan Button biasa ---
-        Button(
-            onClick = onConfirm,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(50)
-        ) {
-            Text(buttonText)
-        }
+        SlideToConfirmButton(
+            text = buttonText,
+            onConfirmed = onSlideConfirmed
+        )
     }
 }
 
