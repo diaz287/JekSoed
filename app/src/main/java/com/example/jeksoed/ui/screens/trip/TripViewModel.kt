@@ -29,7 +29,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 sealed class TripNavEvent {
-    object NavigateToDriverHome : TripNavEvent()
+    object NavigateToHome : TripNavEvent()
     data class NavigateToRatingScreen(val driverId: String, val rideRequestId: String) : TripNavEvent()
     data class NavigateToTripCompleted(val rideRequestId: String) : TripNavEvent()
 }
@@ -163,20 +163,10 @@ class TripViewModel(
         }
     }
 
-    fun logout() {
-        auth.signOut()
-    }
-
-    fun finishAndNavigateHome() {
-        viewModelScope.launch {
-            _navEvent.emit(TripNavEvent.NavigateToDriverHome)
-        }
-    }
-
     fun cancelTrip() {
         updateTripStatus("cancelled")
         viewModelScope.launch {
-            _navEvent.emit(TripNavEvent.NavigateToDriverHome)
+            _navEvent.emit(TripNavEvent.NavigateToHome)
         }
     }
     fun confirmPaymentAndFinishTrip() {

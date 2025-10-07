@@ -69,8 +69,10 @@ fun TripScreen(
     LaunchedEffect(Unit) {
         viewModel.navEvent.collect { event ->
             when (event) {
-                is TripNavEvent.NavigateToDriverHome -> {
-                    navController.navigate(Screen.DriverMain.route) {
+                is TripNavEvent.NavigateToHome -> {
+                    // Cek peran pengguna dari uiState, lalu arahkan ke tujuan yang benar
+                    val destination = if (uiState.isDriver) Screen.DriverMain.route else Screen.PassengerMain.route
+                    navController.navigate(destination) {
                         popUpTo(navController.graph.startDestinationId) { inclusive = true }
                     }
                 }

@@ -1,8 +1,5 @@
-// main/java/com/example/jeksoed/ui/screens/trip/components/TripDriverBottomSheet.kt
-
 package com.example.jeksoed.ui.screens.trip.components
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -18,18 +15,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.jeksoed.data.model.User
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.jeksoed.R
-import com.example.jeksoed.data.model.RideRequest
+import com.example.jeksoed.data.model.User
 import com.example.jeksoed.ui.screens.trip.TripUiState
-import com.example.jeksoed.ui.theme.JekSoedTheme
-import com.example.jeksoed.utils.formatCurrency
-
 
 @Composable
 fun TripDriverBottomSheet(
@@ -40,7 +31,7 @@ fun TripDriverBottomSheet(
 ) {
     var showCancelDialog by remember { mutableStateOf(false) }
     val rideRequest = uiState.rideRequest ?: return // Jangan render jika data belum ada
-    val passenger = uiState.otherUser
+    val passenger = uiState.otherUser // Mengambil data penumpang dari uiState
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -48,7 +39,7 @@ fun TripDriverBottomSheet(
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // --- Bagian Info Penumpang & Rute ---
+            // --- Bagian Info Penumpang & Rute (Sekarang menggunakan data dinamis) ---
             PassengerInfo(
                 passenger = passenger,
                 onChatClick = onChatClick
@@ -60,28 +51,28 @@ fun TripDriverBottomSheet(
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
-            // --- Bagian Aksi (berubah sesuai status) ---
+            // --- Bagian Aksi (menggunakan harga dinamis) ---
             when (rideRequest.status) {
                 "accepted" -> StatusContent(
                     totalPayment = rideRequest.price ?: "Rp0",
-                    buttonText = "Geser jika sudah sampai",
-                    onSlideConfirmed = { onUpdateStatus("arrived") }
+                    buttonText = "Sudah sampai di lokasi jemput",
+                    onConfirm = { onUpdateStatus("arrived") }
                 )
                 "arrived" -> StatusContent(
                     totalPayment = rideRequest.price ?: "Rp0",
-                    buttonText = "Geser untuk memulai perjalanan",
-                    onSlideConfirmed = { onUpdateStatus("started") }
+                    buttonText = "Mulai Perjalanan",
+                    onConfirm = { onUpdateStatus("started") }
                 )
                 "started" -> StatusContent(
                     totalPayment = rideRequest.price ?: "Rp0",
-                    buttonText = "Geser jika sudah sampai tujuan",
-                    onSlideConfirmed = { onUpdateStatus("completed") }
+                    buttonText = "Selesaikan Perjalanan",
+                    onConfirm = { onUpdateStatus("completed") }
                 )
             }
             if (rideRequest.status != "completed") {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Mau dibatalin?",
+                    text = "Batalkan Pesanan?",
                     color = Color.Gray,
                     modifier = Modifier
                         .align(Alignment.CenterHorizontally)
@@ -103,7 +94,7 @@ fun TripDriverBottomSheet(
     }
 }
 
-// --- Komponen-komponen Kecil untuk Bottom Sheet ---
+// --- Komponen-komponen Kecil yang Sudah Diperbaiki ---
 
 @Composable
 private fun PassengerInfo(passenger: User?, onChatClick: () -> Unit) {
@@ -152,6 +143,33 @@ private fun RouteRow(iconRes: Int, location: String) {
 }
 
 @Composable
+private fun StatusContent(
+    totalPayment: String,
+    buttonText: String,
+    onConfirm: () -> Unit
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("Total pembayaran", color = Color.Gray)
+            Text(totalPayment, fontWeight = FontWeight.Bold)
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // --- PERBAIKAN: Mengganti SlideToConfirmButton dengan Button biasa ---
+        Button(
+            onClick = onConfirm,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(50)
+        ) {
+            Text(buttonText)
+        }
+    }
+}
+
+@Composable
 fun CancelTripDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -171,27 +189,4 @@ fun CancelTripDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
             }
         }
     )
-}
-
-@Composable
-private fun StatusContent(
-    totalPayment: String,
-    buttonText: String,
-    onSlideConfirmed: () -> Unit
-) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text("Total pembayaran", color = Color.Gray)
-            Text(totalPayment, fontWeight = FontWeight.Bold)
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-        // Ganti Button dengan SlideToConfirmButton
-        SlideToConfirmButton(
-            text = buttonText,
-            onConfirmed = onSlideConfirmed
-        )
-    }
 }
