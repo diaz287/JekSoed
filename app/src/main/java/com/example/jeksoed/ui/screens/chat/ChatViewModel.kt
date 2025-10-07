@@ -3,6 +3,7 @@
 package com.example.jeksoed.ui.screens.chat
 
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -52,6 +53,7 @@ class ChatViewModel(
     val uiState = _uiState.asStateFlow()
 
     init {
+        Log.d("ChatViewModel", "rideRequestId = $rideRequestId")
         if (currentUserId != null) {
             listenForMessages()
             loadUsersInfo()

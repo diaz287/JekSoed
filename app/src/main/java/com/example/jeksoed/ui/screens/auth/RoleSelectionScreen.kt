@@ -69,9 +69,7 @@ fun RoleSelectionScreen(navController: NavController) {
                     imageResId = R.drawable.home_bg, // Pastikan ada drawable ini
                     label = "Driver!",
                     onClick = {
-                        // Arahkan ke RegisterScreen dengan membawa peran "driver"
-                        // Di aplikasi nyata, ini bisa mengarah ke layar registrasi driver yang berbeda
-                        navController.navigate(Screen.Register.createRoute("driver"))
+                        navController.navigate(Screen.RegisterDriverGraph.route)
                     }
                 )
             }

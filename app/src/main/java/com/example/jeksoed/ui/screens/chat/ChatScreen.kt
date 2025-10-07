@@ -103,6 +103,7 @@ fun ChatScreen(
     }
 }
 
+
 // --- COMPOSABLE BARU UNTUK TOP BAR ---
 @Composable
 fun ChatTopBar(name: String, photoUrl: String?, onBackClick: () -> Unit) {
@@ -228,7 +229,7 @@ fun MessageInput(
             trailingIcon = {
                 if (value.isBlank()) {
                     Row {
-                        Icon(Icons.Outlined.Mic, contentDescription = "Voice Message", modifier = Modifier.padding(horizontal = 8.dp))
+                        Icon(Icons.Outlined.Mic, contentDescription = "Voice Message", modifier = Modifier.padding(vertical = 12.dp))
                         IconButton(onClick = onAttachClick, enabled = !isUploading) {
                             if (isUploading) {
                                 CircularProgressIndicator(modifier = Modifier.size(24.dp))

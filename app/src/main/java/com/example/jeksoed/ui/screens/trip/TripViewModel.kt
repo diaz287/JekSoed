@@ -6,10 +6,10 @@ import android.content.pm.PackageManager
 import android.os.Looper
 import android.util.Log
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.jeksoed.data.model.RideRequest
+import com.example.jeksoed.data.model.User
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
@@ -20,42 +20,40 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.maps.android.PolyUtil
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.tasks.await
 
 sealed class TripNavEvent {
-    object NavigateToDriverHome : TripNavEvent()
-    data class NavigateToRatingScreen(val driverId: String) : TripNavEvent()
+    object NavigateToHome : TripNavEvent()
+    data class NavigateToRatingScreen(val driverId: String, val rideRequestId: String) : TripNavEvent()
+    data class NavigateToTripCompleted(val rideRequestId: String) : TripNavEvent()
 }
 
-// Data class untuk menampung semua state UI dalam satu objek
 data class TripUiState(
     val rideRequest: RideRequest? = null,
     val polylinePoints: List<LatLng> = emptyList(),
     val isDriver: Boolean = false,
-    val otherUserName: String = "Memuat...",
-    val otherUserPhotoUrl: String? = null,
-    val otherUserExtraInfo: String? = null
+    val otherUser: User? = null
 )
 
 class TripViewModel(
-    savedStateHandle: SavedStateHandle
+    private val rideRequestId: String,
+    private val db: FirebaseFirestore,
+    private val auth: FirebaseAuth
 ) : ViewModel() {
 
-    private val rideRequestId: String = savedStateHandle.get<String>("rideRequestId")!!
-    private val db = FirebaseFirestore.getInstance()
-    private val auth = FirebaseAuth.getInstance()
-    private val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+    private val currentUserId = auth.currentUser?.uid
     private var rideRequestListener: ListenerRegistration? = null
     private var locationCallback: LocationCallback? = null
 
     private val _uiState = MutableStateFlow(TripUiState())
     val uiState = _uiState.asStateFlow()
+
     private val _navEvent = MutableSharedFlow<TripNavEvent>()
     val navEvent = _navEvent.asSharedFlow()
 
@@ -76,24 +74,19 @@ class TripViewModel(
                     val request = snapshot.toObject(RideRequest::class.java)?.copy(id = snapshot.id)
                     val isDriver = request?.driverId == currentUserId
 
-                    _uiState.update { currentState ->
-                        currentState.copy(
+                    _uiState.update {
+                        it.copy(
                             rideRequest = request,
-                            isDriver = request?.driverId == currentUserId,
+                            isDriver = isDriver,
                             polylinePoints = request?.encodedPolyline?.let { PolyUtil.decode(it) } ?: emptyList()
                         )
                     }
-                    loadOtherUserInfo(isDriver = isDriver, rideRequest = request)
 
-                    if (request?.status == "completed") {
+                    loadOtherUserInfo(isDriver, request)
+
+                    if (request?.status == "completed" && !isDriver) {
                         viewModelScope.launch {
-                            // Navigasi ke RatingScreen untuk penumpang
-                            if (!isDriver) {
-                                val driverId = request.driverId
-                                if (driverId != null) {
-                                    _navEvent.emit(TripNavEvent.NavigateToRatingScreen(driverId))
-                                }
-                            }
+                            _navEvent.emit(TripNavEvent.NavigateToTripCompleted(rideRequestId))
                         }
                     }
                 }
@@ -105,26 +98,22 @@ class TripViewModel(
             if (rideRequest == null) return@launch
             val otherUserId = if (isDriver) rideRequest.passengerId else rideRequest.driverId
 
-            if (otherUserId != null && otherUserId.isNotBlank()) {
+            if (!otherUserId.isNullOrBlank()) {
                 try {
                     val userDoc = db.collection("users").document(otherUserId).get().await()
-                    _uiState.update {
-                        it.copy(
-                            otherUserName = userDoc.getString("nama") ?: "User",
-                            otherUserPhotoUrl = userDoc.getString("photoUrl"),
-                            otherUserExtraInfo = if (!isDriver) userDoc.getString("platNomor") else null // Ambil plat jika user adalah penumpang
-                        )
-                    }
+                    val user = userDoc.toObject(User::class.java)
+                    _uiState.update { it.copy(otherUser = user) }
                 } catch (e: Exception) {
                     Log.e("TripViewModel", "Gagal memuat info user lain", e)
-                    _uiState.update { it.copy(otherUserName = "Tidak Ditemukan") }
                 }
             }
         }
     }
 
     fun startLocationUpdates(fusedLocationClient: FusedLocationProviderClient, context: Context) {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED
+        ) return
 
         val locationRequest = LocationRequest.create().apply {
             interval = 10000
@@ -141,6 +130,7 @@ class TripViewModel(
                 }
             }
         }
+
         fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback!!, Looper.getMainLooper())
     }
 
@@ -150,7 +140,6 @@ class TripViewModel(
         }
     }
 
-    // Membersihkan listener saat ViewModel dihancurkan
     override fun onCleared() {
         super.onCleared()
         rideRequestListener?.remove()
@@ -174,24 +163,15 @@ class TripViewModel(
         }
     }
 
-    fun logout() {
-        auth.signOut()
-    }
-
-
-    fun finishAndNavigateHome() {
+    fun cancelTrip() {
+        updateTripStatus("cancelled")
         viewModelScope.launch {
-            _navEvent.emit(TripNavEvent.NavigateToDriverHome)
+            _navEvent.emit(TripNavEvent.NavigateToHome)
         }
     }
-
-    // --- FUNGSI BARU: Untuk membatalkan perjalanan ---
-    fun cancelTrip() {
-        // Logika pembatalan bisa lebih kompleks, misal: update status ke "cancelled"
-        // Untuk saat ini, kita langsung arahkan driver kembali ke home
-        updateTripStatus("cancelled") // Opsional: update status di DB
+    fun confirmPaymentAndFinishTrip() {
         viewModelScope.launch {
-            _navEvent.emit(TripNavEvent.NavigateToDriverHome)
+            _navEvent.emit(TripNavEvent.NavigateToTripCompleted(rideRequestId))
         }
     }
 }

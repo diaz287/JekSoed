@@ -2,20 +2,24 @@
 
 package com.example.jeksoed.ui.screens.passenger
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.util.UUID
 
 data class EditProfileUiState(
     val name: String = "",
     val phone: String = "",
+    val photoUrl: String = "",
     val oldPassword: String = "",
     val newPassword: String = "",
     val isLoading: Boolean = false,
@@ -26,6 +30,7 @@ data class EditProfileUiState(
 class EditProfileViewModel : ViewModel() {
     private val auth = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
+    private val storage = FirebaseStorage.getInstance()
     private val currentUser = auth.currentUser
 
     private val _uiState = MutableStateFlow(EditProfileUiState())
@@ -42,7 +47,8 @@ class EditProfileViewModel : ViewModel() {
                 _uiState.update {
                     it.copy(
                         name = userDoc.getString("nama") ?: "",
-                        phone = userDoc.getString("nomorHp") ?: ""
+                        phone = userDoc.getString("nomorHp") ?: "",
+                        photoUrl = userDoc.getString("photoUrl") ?: ""
                     )
                 }
             }
@@ -53,6 +59,50 @@ class EditProfileViewModel : ViewModel() {
     fun onPhoneChange(newPhone: String) { _uiState.update { it.copy(phone = newPhone) } }
     fun onOldPasswordChange(pass: String) { _uiState.update { it.copy(oldPassword = pass) } }
     fun onNewPasswordChange(pass: String) { _uiState.update { it.copy(newPassword = pass) } }
+    fun uploadProfilePhoto(uri: Uri) {
+        viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(isLoading = true, error = null) }
+
+                val uid = currentUser?.uid ?: return@launch
+                val fileName = "${UUID.randomUUID()}.jpg"
+                val ref = storage.reference.child("profile_images/$uid/$fileName")
+
+                // Upload foto
+                ref.putFile(uri).await()
+                val downloadUrl = ref.downloadUrl.await().toString()
+
+                // Simpan URL ke Firestore
+                firestore.collection("users").document(uid)
+                    .update("photoUrl", downloadUrl)
+                    .await()
+
+                _uiState.update { it.copy(photoUrl = downloadUrl, isLoading = false) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoading = false, error = e.message ?: "Gagal upload foto.") }
+            }
+        }
+    }
+
+    fun deleteProfilePhoto() {
+        viewModelScope.launch {
+            try {
+                val uid = currentUser?.uid ?: return@launch
+                _uiState.update { it.copy(isLoading = true) }
+
+                // Hapus URL foto di Firestore
+                firestore.collection("users").document(uid)
+                    .update("photoUrl", "")
+                    .await()
+
+                // Update UI state agar foto hilang
+                _uiState.update { it.copy(photoUrl = "", isLoading = false, successMessage = "Foto profil dihapus.") }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoading = false, error = e.message ?: "Gagal menghapus foto profil.") }
+            }
+        }
+    }
+
 
     fun saveChanges() {
         viewModelScope.launch {

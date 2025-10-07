@@ -34,14 +34,23 @@ import com.example.jeksoed.ui.screens.trip.components.PaymentConfirmationCard
 import com.example.jeksoed.ui.screens.trip.components.TripDriverBottomSheet
 import com.example.jeksoed.ui.screens.trip.components.TripPassengerSheet
 import com.example.jeksoed.utils.formatCurrency
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 
 // Composable "Pintar" yang terhubung ke ViewModel
 @Composable
 fun TripScreen(
     navController: NavController,
-    rideRequestId: String,
-    viewModel: TripViewModel = viewModel()
+    rideRequestId: String
 ) {
+    val viewModel: TripViewModel = viewModel(
+        factory = TripViewModelFactory(
+            rideRequestId = rideRequestId,
+            firestore = FirebaseFirestore.getInstance(),
+            auth = FirebaseAuth.getInstance()
+        )
+    )
+
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
 
@@ -56,12 +65,14 @@ fun TripScreen(
         }
     }
 
-    // Logic untuk navigasi (tidak berubah)
+    // Logic untuk navigasi
     LaunchedEffect(Unit) {
         viewModel.navEvent.collect { event ->
             when (event) {
-                is TripNavEvent.NavigateToDriverHome -> {
-                    navController.navigate(Screen.DriverMain.route) {
+                is TripNavEvent.NavigateToHome -> {
+                    // Cek peran pengguna dari uiState, lalu arahkan ke tujuan yang benar
+                    val destination = if (uiState.isDriver) Screen.DriverMain.route else Screen.PassengerMain.route
+                    navController.navigate(destination) {
                         popUpTo(navController.graph.startDestinationId) { inclusive = true }
                     }
                 }
@@ -70,6 +81,12 @@ fun TripScreen(
                         popUpTo(navController.graph.startDestinationId) { inclusive = true }
                     }
                 }
+                is TripNavEvent.NavigateToTripCompleted -> {
+                    navController.navigate(Screen.TripCompleted.createRoute(event.rideRequestId)) {
+                        popUpTo(Screen.Trip.route) { inclusive = true }
+                    }
+                }
+
             }
         }
     }
@@ -80,13 +97,7 @@ fun TripScreen(
         cameraPositionState = rememberCameraPositionState(),
         onUpdateStatus = viewModel::updateTripStatus,
         onCancelTrip = viewModel::cancelTrip,
-        onFinishTrip = {
-            // Navigasi ke TripCompletedScreen saat pembayaran dikonfirmasi
-            navController.navigate(Screen.TripCompleted.createRoute(rideRequestId)) {
-                // Hapus TripScreen dari backstack agar tidak bisa kembali
-                popUpTo(Screen.Trip.route) { inclusive = true }
-            }
-        },
+        onFinishTrip = viewModel::confirmPaymentAndFinishTrip,
         onChatClick = { rideId ->
             navController.navigate(Screen.Chat.createRoute(rideId))
         },
@@ -167,7 +178,6 @@ fun TripScreenLayout(
         Box(modifier = Modifier.align(Alignment.BottomCenter)) {
             if (uiState.isDriver) {
                 // Tampilan untuk Driver
-                // ... (Kode AnimatedVisibility untuk Driver tetap sama)
                 AnimatedVisibility(
                     visible = uiState.rideRequest?.status != "completed",
                     exit = slideOutVertically { it }
@@ -185,7 +195,7 @@ fun TripScreenLayout(
                     enter = slideInVertically { it }
                 ) {
                     PaymentConfirmationCard(
-                        totalPayment = formatCurrency(10000),
+                        totalPayment = uiState.rideRequest?.price ?: "Rp0",
                         onConfirmClick = onFinishTrip
                     )
                 }
