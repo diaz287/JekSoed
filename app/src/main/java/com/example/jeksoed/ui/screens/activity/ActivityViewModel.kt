@@ -2,6 +2,7 @@
 
 package com.example.jeksoed.ui.screens.activity
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.jeksoed.data.model.RideRequest
@@ -75,16 +76,25 @@ class ActivityViewModel : ViewModel() {
 
                 // --- PROSES DATA GABUNGAN DI SINI ---
                 viewModelScope.launch {
-                    val rides = snapshot.toObjects(RideRequest::class.java)
-                    val historyItems = rides.mapNotNull { ride ->
+                    // --- PERBAIKAN: Iterasi melalui dokumen untuk mendapatkan ID ---
+                    val historyItems = snapshot.documents.mapNotNull { doc ->
+                        // Konversi dokumen ke objek DAN tambahkan ID-nya
+                        val ride = doc.toObject(RideRequest::class.java)?.copy(id = doc.id)
+                        if (ride == null) return@mapNotNull null
+
                         val otherUserId = if (isDriver) ride.passengerId else ride.driverId
-                        if (otherUserId == null) return@mapNotNull null
+                        // Tambahkan pengecekan isNullOrBlank untuk keamanan
+                        if (otherUserId.isNullOrBlank()) {
+                            Log.w("ActivityViewModel", "Ride with ID ${ride.id} is missing other user's ID.")
+                            return@mapNotNull null
+                        }
 
                         try {
                             val userDoc = db.collection("users").document(otherUserId).get().await()
                             val otherUserName = userDoc.getString("nama") ?: "User"
                             RideHistoryDisplay(ride = ride, otherUserName = otherUserName)
                         } catch (ex: Exception) {
+                            Log.e("ActivityViewModel", "Failed to fetch user data for ID: $otherUserId", ex)
                             null
                         }
                     }

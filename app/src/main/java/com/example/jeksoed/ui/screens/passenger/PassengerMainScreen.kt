@@ -1,16 +1,7 @@
 package com.example.jeksoed.ui.screens.passenger
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -122,13 +113,11 @@ fun BottomNavigationBar(navController: NavHostController) {
     }
 }
 
-
 @Composable
 fun BottomNavGraph(mainNavController: NavController, bottomNavController: NavHostController) {
     NavHost(navController = bottomNavController, startDestination = "home") {
         composable("home") {
-            // --- PERUBAHAN 1 ---
-            // Teruskan navController utama ke HomeScreen
+            // Pemanggilan HomeScreen sudah benar
             HomeScreen(
                 navController = mainNavController,
                 onSearchClick = {
@@ -140,32 +129,8 @@ fun BottomNavGraph(mainNavController: NavController, bottomNavController: NavHos
             ActivityScreen(navController = mainNavController)
         }
 
-        // --- PERUBAHAN 2 ---
-        // Panggil ProfileScreen yang benar dan teruskan navController utama
         composable("profil") {
             ProfileScreen(navController = mainNavController)
         }
-    }
-}
-
-// --- Halaman Placeholder untuk Riwayat ---
-// Hapus ProfilScreen placeholder karena kita sudah punya implementasi aslinya
-
-@Composable
-fun ActivityScreen() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = androidx.compose.ui.Alignment.Center
-    ) {
-        Text("Halaman Riwayat Perjalanan")
-    }
-}
-
-
-@Preview(showBackground = true, showSystemUi = true)
-@Composable
-fun PassengerMainScreenPreview() {
-    JekSoedTheme {
-        PassengerMainScreen(mainNavController = rememberNavController())
     }
 }

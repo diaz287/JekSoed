@@ -14,24 +14,23 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.jeksoed.R
-import com.example.jeksoed.ui.screens.passenger.HistoryItem
+import com.example.jeksoed.data.model.RideRequest
 
 @Composable
-fun RecentHistoryList() {
-    val history = listOf(
-        HistoryItem("Fakultas Kedokteran - Unsoed", "Jl. Dr. Gumbreg No.1, Mersi, Purwokerto..."),
-        HistoryItem("Moro Mall", "Jl. Perintis Kemerdekaan, Purwokerto...")
-    )
-
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        history.forEach { item ->
-            HistoryRowItem(item = item)
+fun RecentHistoryList(history: List<RideRequest>) {
+    if (history.isEmpty()) {
+        Text("Belum ada riwayat perjalanan.", color = Color.Gray, fontSize = 14.sp)
+    } else {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            history.forEach { item ->
+                HistoryRowItem(item = item)
+            }
         }
     }
 }
 
 @Composable
-fun HistoryRowItem(item: HistoryItem) {
+fun HistoryRowItem(item: RideRequest) {
     Column {
         HorizontalDivider(thickness = 1.dp, color = Color.LightGray, modifier = Modifier.padding(bottom = 14.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -42,9 +41,10 @@ fun HistoryRowItem(item: HistoryItem) {
                 modifier = Modifier.size(16.dp)
             )
             Spacer(modifier = Modifier.width(10.dp))
-            Text(text = item.title, fontWeight = FontWeight.Medium)
+            // --- PERUBAHAN DI SINI: Gunakan data dinamis ---
+            Text(text = item.destinationName ?: "Tujuan", fontWeight = FontWeight.Medium)
         }
         Spacer(modifier = Modifier.height(4.dp))
-        Text(text = item.address, fontSize = 14.sp, color = Color.Gray)
+        Text(text = item.destinationAddress ?: "Alamat tidak tersedia", fontSize = 14.sp, color = Color.Gray)
     }
 }

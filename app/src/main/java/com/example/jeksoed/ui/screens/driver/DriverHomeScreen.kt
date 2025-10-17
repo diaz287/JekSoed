@@ -11,8 +11,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -31,21 +29,16 @@ import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import com.example.jeksoed.R
 import com.example.jeksoed.navigation.Screen
 import com.example.jeksoed.ui.screens.driver.components.RideRequestPopup
-import com.example.jeksoed.ui.theme.JekSoedTheme
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
 import kotlinx.coroutines.delay
 
@@ -69,6 +62,13 @@ fun DriverHomeScreen(navController: NavController, viewModel: DriverHomeViewMode
             }
         }
     )
+
+    LaunchedEffect(Unit) {
+        viewModel.navigateToActiveTrip.collect { rideId ->
+            // Gunakan NavController utama untuk navigasi
+            navController.navigate(Screen.Trip.createRoute(rideId))
+        }
+    }
 
     // Efek untuk menggerakkan kamera
     LaunchedEffect(driverLocation) {
@@ -171,8 +171,8 @@ fun DriverHomeScreen(navController: NavController, viewModel: DriverHomeViewMode
                             }
                         )
                     },
-                    onReject = { rideId ->
-                        viewModel.rejectRide(rideId)
+                    onReject = {
+                        viewModel.rejectRide(request.id)
                     }
                 )
             }

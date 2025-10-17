@@ -1,25 +1,30 @@
-// main/java/com/example/jeksoed/ui/screens/activity/ActivityDetailViewModel.kt
-
 package com.example.jeksoed.ui.screens.activity
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.jeksoed.data.model.RideRequest
+import com.example.jeksoed.data.model.User
+import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ktx.toObject
+import com.google.maps.android.PolyUtil
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.text.DecimalFormat
 
 data class ActivityDetailUiState(
     val isLoading: Boolean = true,
     val rideRequest: RideRequest? = null,
-    val otherUserName: String = "",
+    val otherUser: User? = null,
     val isChatEnabled: Boolean = false,
-    val isDriver: Boolean = false // State untuk menentukan peran pengguna
+    val isDriver: Boolean = false,
+    // --- TAMBAHKAN STATE UNTUK POIN RUTE ---
+    val polylinePoints: List<LatLng> = emptyList()
 )
 
 class ActivityDetailViewModel(
@@ -40,27 +45,37 @@ class ActivityDetailViewModel(
         viewModelScope.launch {
             try {
                 val rideDoc = db.collection("ride_requests").document(rideRequestId).get().await()
-                val ride = rideDoc.toObject(RideRequest::class.java)
+                val ride = rideDoc.toObject<RideRequest>()?.copy(id = rideDoc.id)
                 if (ride != null) {
                     val currentUserId = auth.currentUser?.uid
-                    val isDriver = ride.driverId == currentUserId // Logika penentuan peran ada di sini
+                    val isDriver = ride.driverId == currentUserId
                     val otherUserId = if (isDriver) ride.passengerId else ride.driverId
 
-                    val otherUserDoc = db.collection("users").document(otherUserId ?: "").get().await()
-                    val otherUserName = otherUserDoc.getString("nama") ?: "User"
+                    var otherUser: User? = null
+                    if (!otherUserId.isNullOrBlank()) {
+                        val otherUserDoc = db.collection("users").document(otherUserId).get().await()
+                        otherUser = otherUserDoc.toObject<User>()
+                    }
 
-                    // Cek apakah chat masih aktif (dalam 30 menit setelah pesanan dibuat)
                     val completedAt = ride.createdAt?.toDate()?.time ?: 0L
                     val thirtyMinutesInMillis = 30 * 60 * 1000
                     val isChatEnabled = (System.currentTimeMillis() - completedAt) < thirtyMinutesInMillis
+
+                    // --- DECODE POLYLINE DI SINI ---
+                    val polylinePoints = if (!ride.encodedPolyline.isNullOrBlank()) {
+                        PolyUtil.decode(ride.encodedPolyline)
+                    } else {
+                        emptyList()
+                    }
 
                     _uiState.update {
                         it.copy(
                             isLoading = false,
                             rideRequest = ride,
-                            otherUserName = otherUserName,
+                            otherUser = otherUser,
                             isChatEnabled = isChatEnabled,
-                            isDriver = isDriver // Perbarui state peran
+                            isDriver = isDriver,
+                            polylinePoints = polylinePoints // Simpan poin rute ke state
                         )
                     }
                 }
@@ -68,5 +83,11 @@ class ActivityDetailViewModel(
                 _uiState.update { it.copy(isLoading = false) }
             }
         }
+    }
+
+    fun getFormattedRating(user: User?): String {
+        if (user == null || user.ratingCount == 0L) return "0.0"
+        val avg = user.totalRating.toDouble() / user.ratingCount.toDouble()
+        return DecimalFormat("#.#").format(avg)
     }
 }

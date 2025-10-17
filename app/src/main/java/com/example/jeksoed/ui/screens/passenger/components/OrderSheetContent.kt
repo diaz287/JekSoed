@@ -15,15 +15,16 @@ import androidx.compose.ui.unit.dp
 import com.example.jeksoed.ui.screens.passenger.OrderStage
 import com.example.jeksoed.ui.screens.passenger.OrderUiState
 import com.example.jeksoed.ui.screens.passenger.OrderViewModel
+import com.google.android.libraries.places.api.net.PlacesClient
 
 @Composable
 fun OrderSheetContent(
     uiState: OrderUiState,
     viewModel: OrderViewModel,
-    placesClient: com.google.android.libraries.places.api.net.PlacesClient,
+    placesClient: PlacesClient,
     apiKey: String,
-    // --- TAMBAHKAN PARAMETER BARU ---
-    onTextFieldFocus: () -> Unit
+    onTextFieldFocus: () -> Unit,
+    onCreateOrderClick: () -> Unit
 ) {
     val context = LocalContext.current
 
@@ -44,8 +45,9 @@ fun OrderSheetContent(
                     uiState = uiState,
                     viewModel = viewModel,
                     placesClient = placesClient,
-                    // --- TERUSKAN FUNGSI KE SEARCH STAGE ---
-                    onTextFieldFocus = onTextFieldFocus
+                    onTextFieldFocus = onTextFieldFocus,
+                    context = context,
+                    apiKey = apiKey
                 )
                 OrderStage.PICKUP_CONFIRM -> PickupConfirmStage(
                     uiState = uiState,
@@ -54,7 +56,7 @@ fun OrderSheetContent(
                 )
                 OrderStage.ROUTE_CONFIRM -> RouteConfirmStage(
                     uiState = uiState,
-                    onCreateOrderClick = { viewModel.createOrder() },
+                    onCreateOrderClick = onCreateOrderClick,
                 )
                 OrderStage.FINDING_DRIVER -> FindingDriverStage(
                     onCancelClick = { viewModel.cancelFindingDriver() }

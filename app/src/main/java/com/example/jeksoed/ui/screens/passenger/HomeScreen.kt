@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.example.jeksoed.R
@@ -31,17 +32,24 @@ import com.example.jeksoed.ui.theme.JekSoedTheme
 
 // Data class bisa tetap ada
 data class Category(val name: String, val iconResId: Int, val tag: String? = null)
-data class HistoryItem(val title: String, val address: String)
+// HistoryItem tidak lagi diperlukan karena kita akan menggunakan RideRequest
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     navController: NavController,
-    onSearchClick: () -> Unit
+    onSearchClick: () -> Unit,
+    viewModel: HomeViewModel = viewModel()
 ) {
+    val uiState by viewModel.uiState.collectAsState()
     var showDialog by remember { mutableStateOf(false) }
     val hasNotification by remember { mutableStateOf(true) }
-    val userName = "Rafi Purnama"
+
+    LaunchedEffect(Unit) {
+        viewModel.navigateToActiveTrip.collect { rideId ->
+            navController.navigate(Screen.Trip.createRoute(rideId))
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -56,7 +64,7 @@ fun HomeScreen(
             item {
                 Column {
                     TopHeader(
-                        name = userName,
+                        name = uiState.userName,
                         hasNotification = hasNotification,
                         onNotificationClick = { /* TODO: Logika klik notifikasi */ }
                     )
@@ -71,7 +79,6 @@ fun HomeScreen(
                 }
             }
 
-            // --- PERUBAHAN DI SINI ---
             // Item 2: Card yang berisi SearchBar dan semua konten lainnya
             item {
                 Card(
@@ -106,7 +113,12 @@ fun HomeScreen(
                         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                             Text("Baru baru ini...", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.height(12.dp))
-                            RecentHistoryList()
+                            // --- PERUBAHAN 4: Tampilkan loading dan riwayat dinamis ---
+                            if (uiState.isLoading) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                            } else {
+                                RecentHistoryList(history = uiState.recentTrips)
+                            }
                             Spacer(modifier = Modifier.height(24.dp))
                         }
 

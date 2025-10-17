@@ -13,10 +13,12 @@ data class RideRequest(
     val duration: String = "",
     val status: String = "",
     val createdAt: Timestamp? = null,
+    val completedAt: Timestamp? = null,
     val driverId: String? = null,
     val encodedPolyline: String? = null,
     val driverCurrentLocation: Map<String, Double>? = null,
     val price: String? = null,
     val destinationAddress: String? = null,
-    val pickupAddress: String? = null
+    val pickupAddress: String? = null,
+    val rating: Int = 0
 )

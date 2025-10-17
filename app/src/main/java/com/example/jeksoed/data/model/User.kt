@@ -1,25 +1,27 @@
 package com.example.jeksoed.data.model
 
-import com.google.firebase.firestore.ServerTimestamp
 import com.google.firebase.Timestamp
+import com.google.firebase.firestore.ServerTimestamp
 
-/**
- * Data class ini merepresentasikan struktur data untuk seorang pengguna
- * di dalam koleksi "users" pada Firestore.
- */
 data class User(
     val uid: String = "",
     val nama: String = "",
     val email: String = "",
-    val role: String = "", // "penumpang" atau "driver"
+    val role: String = "",
     val photoUrl: String? = null,
+    val nim: String = "",
+    val nomorHp: String = "",
 
     // Field khusus untuk driver
-    val licensePlate: String? = null, // Plat Nomor Kendaraan
-    val vehicleType: String? = null, // Jenis Kendaraan (misal: Motor, Mobil)
+    val licensePlate: String? = null,
+    val vehicleType: String? = null,
+    val ktmUrl: String? = null,
+    val stnkUrl: String? = null,
+    val motorUrl: String? = null,
+    val balance: Long = 0L,
 
     // Field tambahan
-    val fcmToken: String? = null, // Untuk notifikasi
+    val fcmToken: String? = null,
     @ServerTimestamp
     val createdAt: Timestamp? = null,
     val totalRating: Long = 0L,

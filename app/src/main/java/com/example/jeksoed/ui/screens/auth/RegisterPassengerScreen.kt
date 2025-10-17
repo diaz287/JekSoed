@@ -2,8 +2,10 @@ package com.example.jeksoed.ui.screens.auth
 
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
@@ -30,7 +32,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 
-
+// --- Smart Composable (Dengan Logika) ---
 @Composable
 fun RegisterPassengerScreen(
     navController: NavController,
@@ -68,6 +70,7 @@ fun RegisterPassengerScreen(
                             val user = auth.currentUser
                             val uid = user?.uid
                             if (uid != null) {
+                                // --- PERBAIKAN: Tambahkan field yang hilang ---
                                 val userMap = hashMapOf(
                                     "uid" to uid,
                                     "nama" to name,
@@ -75,7 +78,10 @@ fun RegisterPassengerScreen(
                                     "email" to email,
                                     "nomorHp" to phone,
                                     "role" to "penumpang",
-                                    "createdAt" to FieldValue.serverTimestamp()
+                                    "createdAt" to FieldValue.serverTimestamp(),
+                                    "balance" to 0L,
+                                    "totalRating" to 0L,
+                                    "ratingCount" to 0L
                                 )
                                 firestore.collection("users").document(uid).set(userMap)
                                     .addOnSuccessListener {
@@ -98,15 +104,14 @@ fun RegisterPassengerScreen(
         },
         onLoginClick = { navController.navigate(Screen.Login.route) },
         onBackClick = { navController.popBackStack() },
-        // --- TERUSKAN NAVCONTROLLER KE UI ---
-        navController = navController
+        onTncClick = { navController.navigate(Screen.Tnc.route) }
     )
 }
 
-
+// --- Dumb Composable (Hanya Tampilan) ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RegisterPassengerScreenUI(
+private fun RegisterPassengerScreenUI(
     name: String,
     nim: String,
     email: String,
@@ -121,8 +126,7 @@ fun RegisterPassengerScreenUI(
     onRegisterClick: () -> Unit,
     onLoginClick: () -> Unit,
     onBackClick: () -> Unit,
-    // --- TAMBAHKAN NAVCONTROLLER SEBAGAI PARAMETER ---
-    navController: NavController
+    onTncClick: () -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -141,6 +145,7 @@ fun RegisterPassengerScreenUI(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -212,7 +217,7 @@ fun RegisterPassengerScreenUI(
                 style = MaterialTheme.typography.bodySmall.copy(textAlign = TextAlign.Center, color = Color.Gray),
                 onClick = { offset ->
                     tncAnnotatedString.getStringAnnotations(tag = "TNC", start = offset, end = offset)
-                        .firstOrNull()?.let { navController.navigate(Screen.Tnc.route) }
+                        .firstOrNull()?.let { onTncClick() }
                 }
             )
         }
@@ -227,9 +232,7 @@ fun RegisterPassengerScreenPreview() {
             name = "", nim = "", email = "", phone = "", password = "",
             isLoading = false,
             onNameChange = {}, onNimChange = {}, onEmailChange = {}, onPhoneChange = {}, onPasswordChange = {},
-            onRegisterClick = {}, onLoginClick = {}, onBackClick = {},
-            // Teruskan NavController palsu untuk Preview
-            navController = rememberNavController()
+            onRegisterClick = {}, onLoginClick = {}, onBackClick = {}, onTncClick = {}
         )
     }
 }

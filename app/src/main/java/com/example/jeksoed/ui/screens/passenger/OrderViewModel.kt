@@ -16,6 +16,7 @@ import com.google.android.libraries.places.api.net.FindAutocompletePredictionsRe
 import com.google.android.libraries.places.api.net.PlacesClient
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.maps.DirectionsApi
 import com.google.maps.GeoApiContext
 import com.google.maps.android.PolyUtil
@@ -23,13 +24,13 @@ import com.google.maps.model.TravelMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
-import com.google.firebase.firestore.ListenerRegistration
 
-// --- DATA CLASS BARU ---
 data class SavedPlace(
     val title: String,
     val address: String,
@@ -51,30 +52,33 @@ data class OrderUiState(
     val pickupLocation: LatLng? = null,
     val destinationLocation: LatLng? = null,
     val predictions: List<AutocompletePrediction> = emptyList(),
-    // --- TAMBAHKAN LIST UNTUK TEMPAT TERSIMPAN ---
     val savedPlaces: List<SavedPlace> = emptyList(),
     val isSearchingPickup: Boolean = false,
     val isSearchingDestination: Boolean = false,
     val routeInfo: RouteInfo? = null,
     val isRouteLoading: Boolean = false,
-    val driverLocations: List<LatLng> = emptyList()
+    val driverLocations: List<LatLng> = emptyList(),
+    val activeRideRequestId: String? = null,
+    val userPhotoUrl: String? = null
 )
 
 class OrderViewModel : ViewModel() {
     private val _userLocation = MutableStateFlow<LatLng?>(null)
-    val userLocation: StateFlow<LatLng?> = _userLocation
+    val userLocation = _userLocation.asStateFlow()
 
-    // Panggil fungsi ini dari UI untuk memulai pengambilan lokasi
     fun getCurrentLocation(fusedLocationProviderClient: FusedLocationProviderClient) {
         try {
-            // Pastikan Anda sudah handle permission check di UI
             fusedLocationProviderClient.lastLocation.addOnSuccessListener { location ->
                 if (location != null) {
-                    _userLocation.value = LatLng(location.latitude, location.longitude)
+                    val latLng = LatLng(location.latitude, location.longitude)
+                    _userLocation.value = latLng
+                    if (_uiState.value.pickupLocation == null) {
+                        setUserLocationAsPickup(latLng)
+                    }
                 }
             }
         } catch (e: SecurityException) {
-            // Handle exception, misal log atau tampilkan pesan error
+            Log.e("OrderViewModel", "Location permission missing", e)
         }
     }
 
@@ -82,9 +86,12 @@ class OrderViewModel : ViewModel() {
     val uiState = _uiState.asStateFlow()
 
     private var searchJob: Job? = null
+    private var activeRideListener: ListenerRegistration? = null
 
+    // --- PERBAIKAN: Menggabungkan kedua blok init ---
     init {
-        // --- ISI DUMMY DATA UNTUK TEMPAT TERSIMPAN ---
+        fetchCurrentUserData()
+
         val dummySavedPlaces = listOf(
             SavedPlace("RITA SuperMall Purwokerto", "Jl. Jend. Sudirman No.296, Pereng, Sokanegara, Kec. Purwokerto Tim., Kabupaten Banyumas", "3.6 Km"),
             SavedPlace("RSU Wiradadi Husada", "Jl. Menteri Supeno No.25, Dusun I Wiradadi, Kec. Sokaraja, Kabupaten Banyumas", "3.6 Km")
@@ -93,12 +100,23 @@ class OrderViewModel : ViewModel() {
             LatLng(-7.430, 109.246),
             LatLng(-7.432, 109.244)
         )
-
         _uiState.update { it.copy(savedPlaces = dummySavedPlaces, driverLocations = dummyDriverLocations) }
     }
 
+    private fun fetchCurrentUserData() {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid
+        if (userId == null) return
 
-    // --- FUNGSI-FUNGSI BARU (PENGGANTI onEvent) ---
+        viewModelScope.launch {
+            try {
+                val document = FirebaseFirestore.getInstance().collection("users").document(userId).get().await()
+                val photoUrl = document.getString("photoUrl")
+                _uiState.update { it.copy(userPhotoUrl = photoUrl) }
+            } catch (e: Exception) {
+                Log.e("OrderViewModel", "Gagal mengambil data pengguna", e)
+            }
+        }
+    }
 
     fun onPickupQueryChange(query: String, placesClient: PlacesClient) {
         _uiState.update { it.copy(pickupQuery = query, isSearchingPickup = true, isSearchingDestination = false, predictions = emptyList()) }
@@ -119,29 +137,26 @@ class OrderViewModel : ViewModel() {
     }
 
     fun setUserLocationAsPickup(location: LatLng) {
-        // Saat menggunakan lokasi saat ini, kita belum punya alamatnya. Beri placeholder.
         _uiState.update { it.copy(pickupLocation = location, pickupQuery = "Lokasi saat ini", pickupAddress = "Menggunakan lokasi Anda saat ini") }
     }
 
-    fun selectPrediction(prediction: AutocompletePrediction, placesClient: PlacesClient) {
+    fun selectPrediction(prediction: AutocompletePrediction, placesClient: PlacesClient, context: Context, apiKey: String) {
         viewModelScope.launch {
             try {
-                // --- MINTA DATA ALAMAT (ADDRESS) DARI API ---
                 val request = FetchPlaceRequest.newInstance(prediction.placeId, listOf(Place.Field.LAT_LNG, Place.Field.NAME, Place.Field.ADDRESS))
                 val response = placesClient.fetchPlace(request).await()
                 val location = response.place.latLng ?: return@launch
                 val name = response.place.name ?: ""
-                val address = response.place.address ?: "" // Ambil alamat
+                val address = response.place.address ?: ""
 
                 if (_uiState.value.isSearchingPickup) {
-                    // --- SIMPAN ALAMAT KE UI STATE ---
                     _uiState.update { it.copy(pickupLocation = location, pickupQuery = name, pickupAddress = address, predictions = emptyList(), isSearchingPickup = false) }
                 } else {
                     _uiState.update { it.copy(destinationLocation = location, destinationQuery = name, predictions = emptyList(), isSearchingDestination = false) }
                 }
 
                 if (_uiState.value.pickupLocation != null && _uiState.value.destinationLocation != null) {
-                    proceedToPickupConfirm()
+                    findRoute(context, apiKey)
                 }
 
             } catch (e: Exception) {
@@ -153,7 +168,7 @@ class OrderViewModel : ViewModel() {
     private fun searchPlaces(query: String, placesClient: PlacesClient) {
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
-            delay(300L) // Debounce
+            delay(300L)
             if (query.length > 2) {
                 try {
                     val request = FindAutocompletePredictionsRequest.builder().setQuery(query).setCountries("ID").build()
@@ -168,16 +183,12 @@ class OrderViewModel : ViewModel() {
         }
     }
 
-    private fun proceedToPickupConfirm() {
-        _uiState.update { it.copy(stage = OrderStage.PICKUP_CONFIRM, predictions = emptyList()) }
-    }
-
     fun findRoute(context: Context, apiKey: String) {
         val pickup = _uiState.value.pickupLocation
         val destination = _uiState.value.destinationLocation
         if (pickup == null || destination == null) return
 
-        _uiState.update { it.copy(isRouteLoading = true) }
+        _uiState.update { it.copy(isRouteLoading = true, stage = OrderStage.ROUTE_CONFIRM) }
         viewModelScope.launch {
             try {
                 val geoApiContext = GeoApiContext.Builder().apiKey(apiKey).build()
@@ -196,7 +207,6 @@ class OrderViewModel : ViewModel() {
 
                     _uiState.update {
                         it.copy(
-                            stage = OrderStage.ROUTE_CONFIRM,
                             isRouteLoading = false,
                             routeInfo = RouteInfo(
                                 distance = leg.distance.humanReadable,
@@ -220,100 +230,94 @@ class OrderViewModel : ViewModel() {
     }
 
     fun createOrder() {
-            val user = FirebaseAuth.getInstance().currentUser
-            val pickup = _uiState.value.pickupLocation
-            val destination = _uiState.value.destinationLocation
-            val route = _uiState.value.routeInfo
+        val user = FirebaseAuth.getInstance().currentUser
+        val pickup = _uiState.value.pickupLocation
+        val destination = _uiState.value.destinationLocation
+        val route = _uiState.value.routeInfo
 
-            if (user == null || pickup == null || destination == null || route == null) {
-                Log.e("OrderViewModel", "Data order belum lengkap!")
-                return
-            }
+        if (user == null || pickup == null || destination == null || route == null) {
+            Log.e("OrderViewModel", "Data order belum lengkap!")
+            return
+        }
 
-            viewModelScope.launch {
-                try {
-                    val firestore = FirebaseFirestore.getInstance()
+        viewModelScope.launch {
+            try {
+                val firestore = FirebaseFirestore.getInstance()
+                val orderData = mapOf(
+                    "passengerId" to user.uid,
+                    "pickupName" to _uiState.value.pickupQuery,
+                    "pickupAddress" to _uiState.value.pickupAddress,
+                    "pickupLocation" to mapOf("latitude" to pickup.latitude, "longitude" to pickup.longitude),
+                    "destinationName" to _uiState.value.destinationQuery,
+                    "destinationAddress" to "",
+                    "destinationLocation" to mapOf("latitude" to destination.latitude, "longitude" to destination.longitude),
+                    "distance" to route.distance,
+                    "duration" to route.duration,
+                    "price" to route.price,
+                    "status" to "pending",
+                    "createdAt" to com.google.firebase.Timestamp.now(),
+                    "encodedPolyline" to route.encodedPath
+                )
+                val documentReference = firestore.collection("ride_requests").add(orderData).await()
+                Log.d("OrderViewModel", "Pesanan berhasil dibuat dengan ID: ${documentReference.id}")
 
-                    val orderData = mapOf(
-                        "passengerId" to user.uid,
-                        "pickupName" to _uiState.value.pickupQuery,
-                        "pickupAddress" to _uiState.value.pickupAddress,
-                        "pickupLat" to pickup.latitude,
-                        "pickupLng" to pickup.longitude,
-                        "destinationName" to _uiState.value.destinationQuery,
-                        "destinationAddress" to "", // optional
-                        "destinationLat" to destination.latitude,
-                        "destinationLng" to destination.longitude,
-                        "distance" to route.distance,
-                        "duration" to route.duration,
-                        "price" to route.price,
-                        "status" to "pending",
-                        "createdAt" to com.google.firebase.Timestamp.now()
+                _uiState.update {
+                    it.copy(
+                        stage = OrderStage.FINDING_DRIVER,
+                        activeRideRequestId = documentReference.id
                     )
-
-                    firestore.collection("ride_requests").add(orderData).await()
-                    Log.d("OrderViewModel", "Pesanan berhasil dibuat!")
-
-                    // ubah stage jadi mencari driver
-                    _uiState.update { it.copy(stage = OrderStage.FINDING_DRIVER) }
-
-                } catch (e: Exception) {
-                    Log.e("OrderViewModel", "Gagal membuat order", e)
                 }
+            } catch (e: Exception) {
+                Log.e("OrderViewModel", "Gagal membuat order", e)
             }
-        Log.d("OrderViewModel", "createOrder() dipanggil! Mengubah stage ke FINDING_DRIVER.")
-        // --- UBAH STAGE KE MENCARI DRIVER ---
-        _uiState.update { it.copy(stage = OrderStage.FINDING_DRIVER) }
+        }
     }
 
     fun cancelFindingDriver() {
-        // Kembali ke tahap sebelumnya (konfirmasi rute)
-        _uiState.update { it.copy(stage = OrderStage.ROUTE_CONFIRM) }
+        val rideId = _uiState.value.activeRideRequestId
+        if (rideId == null) {
+            // Jika tidak ada ID, kembali saja ke state sebelumnya
+            _uiState.update { it.copy(stage = OrderStage.ROUTE_CONFIRM, activeRideRequestId = null) }
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                // Update status di Firestore menjadi "cancelled"
+                FirebaseFirestore.getInstance().collection("ride_requests").document(rideId)
+                    .update("status", "cancelled")
+                    .await()
+                Log.d("OrderViewModel", "Orderan dengan ID $rideId berhasil dibatalkan.")
+            } catch (e: Exception) {
+                Log.e("OrderViewModel", "Gagal membatalkan orderan di Firestore", e)
+                // Tetap lanjutkan meski gagal update di DB agar UI tidak stuck
+            } finally {
+                // Kembali ke tahap sebelumnya (konfirmasi rute) dan hapus ID aktif
+                _uiState.update { it.copy(stage = OrderStage.ROUTE_CONFIRM, activeRideRequestId = null) }
+            }
+        }
     }
 
-    private var activeRideListener: ListenerRegistration? = null
+    fun listenToActiveRide(rideId: String, onRideAccepted: (String) -> Unit) {
+        val rideRequestRef = FirebaseFirestore.getInstance().collection("ride_requests").document(rideId)
+        activeRideListener = rideRequestRef.addSnapshotListener { snapshot, e ->
+            if (e != null) {
+                Log.w("OrderViewModel", "Listen failed.", e)
+                return@addSnapshotListener
+            }
 
-    fun listenToActiveRide(navToTrip: (String) -> Unit) {
-        val user = FirebaseAuth.getInstance().currentUser ?: return
-        val firestore = FirebaseFirestore.getInstance()
-
-        // Bersihkan listener lama kalau ada
-        activeRideListener?.remove()
-
-        activeRideListener = firestore.collection("ride_requests")
-            .whereEqualTo("passengerId", user.uid)
-            .whereIn("status", listOf("pending", "accepted"))
-            .addSnapshotListener { snapshot, e ->
-                if (e != null) {
-                    Log.e("OrderViewModel", "Gagal memantau ride aktif", e)
-                    return@addSnapshotListener
-                }
-
-                val ride = snapshot?.documents?.firstOrNull()
-                if (ride != null) {
-                    val rideId = ride.id
-                    val status = ride.getString("status")
-
-                    when (status) {
-                        "pending" -> {
-                            // masih nunggu driver → tetap di FindingDriverStage
-                            _uiState.update { it.copy(stage = OrderStage.FINDING_DRIVER) }
-                        }
-                        "accepted" -> {
-                            // driver sudah menerima → pindah ke TripScreen
-                            Log.d("OrderViewModel", "Orderan diterima: $rideId")
-                            navToTrip(rideId)
-                            activeRideListener?.remove() // hentikan listener
-                        }
-                    }
+            if (snapshot != null && snapshot.exists()) {
+                val status = snapshot.getString("status")
+                if (status == "accepted") {
+                    onRideAccepted(rideId)
+                    activeRideListener?.remove()
                 }
             }
+        }
     }
 
     override fun onCleared() {
         super.onCleared()
         activeRideListener?.remove()
     }
-
 }
-

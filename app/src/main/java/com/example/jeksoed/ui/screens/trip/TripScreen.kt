@@ -47,11 +47,7 @@ fun TripScreen(
     rideRequestId: String
 ) {
     val viewModel: TripViewModel = viewModel(
-        factory = TripViewModelFactory(
-            rideRequestId = rideRequestId,
-            firestore = FirebaseFirestore.getInstance(),
-            auth = FirebaseAuth.getInstance()
-        )
+        factory = TripViewModelFactory(rideRequestId)
     )
 
     val uiState by viewModel.uiState.collectAsState()
@@ -80,7 +76,7 @@ fun TripScreen(
                     }
                 }
                 is TripNavEvent.NavigateToRatingScreen -> {
-                    navController.navigate(Screen.Rating.createRoute(event.driverId)) {
+                    navController.navigate(Screen.Rating.createRoute(event.driverId, event.rideRequestId)) {
                         popUpTo(navController.graph.startDestinationId) { inclusive = true }
                     }
                 }

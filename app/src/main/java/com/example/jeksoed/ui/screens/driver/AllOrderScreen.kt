@@ -1,7 +1,6 @@
 package com.example.jeksoed.ui.screens.driver
 
 import android.widget.Toast
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -79,12 +78,12 @@ fun AllOrdersScreen(navController: NavController, viewModel: DriverHomeViewModel
                 items(uiState.rideRequests) { request ->
                     RideRequestCard(
                         rideRequest = request,
-                        onAccept = { rideId ->
+                        onAccept = {
                             viewModel.acceptRide(
-                                rideId = rideId,
+                                rideRequest = request,
                                 onSuccess = {
                                     Toast.makeText(context, "Orderan diterima!", Toast.LENGTH_SHORT).show()
-                                    navController.navigate(Screen.Trip.createRoute(rideId)) {
+                                    navController.navigate(Screen.Trip.createRoute(request.id)) {
                                         popUpTo(Screen.AllOrders.route) { inclusive = true }
                                     }
                                 },
@@ -93,8 +92,8 @@ fun AllOrdersScreen(navController: NavController, viewModel: DriverHomeViewModel
                                 }
                             )
                         },
-                        onReject = { rideId ->
-                            viewModel.rejectRide(rideId)
+                        onReject = {
+                            viewModel.rejectRide(request.id)
                             Toast.makeText(context, "Orderan ditolak", Toast.LENGTH_SHORT).show()
                         }
                     )
@@ -107,8 +106,8 @@ fun AllOrdersScreen(navController: NavController, viewModel: DriverHomeViewModel
 @Composable
 fun RideRequestCard(
     rideRequest: RideRequest,
-    onAccept: (String) -> Unit,
-    onReject: (String) -> Unit,
+    onAccept: () -> Unit,
+    onReject: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     // Mengambil info lengkap penumpang (nama & foto) dari Firestore
@@ -165,7 +164,7 @@ fun RideRequestCard(
                     color = Color.Gray
                 )
                 Button(
-                    onClick = { onReject(rideRequest.id) },
+                    onClick = onReject,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFDE0E0)),
                     shape = RoundedCornerShape(50)
                 ) {
@@ -179,7 +178,7 @@ fun RideRequestCard(
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
-                    onClick = { onAccept(rideRequest.id) },
+                    onClick = onAccept,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDFF9E9)),
                     shape = RoundedCornerShape(50)
                 ) {

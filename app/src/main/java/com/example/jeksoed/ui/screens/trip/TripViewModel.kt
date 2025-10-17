@@ -10,7 +10,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.jeksoed.data.model.RideRequest
 import com.example.jeksoed.data.model.User
-import com.example.jeksoed.data.remote.MapsApiService // Import service
+import com.example.jeksoed.data.remote.MapsApiService
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
@@ -75,17 +75,28 @@ class TripViewModel(
                 if (snapshot != null && snapshot.exists()) {
                     val request = snapshot.toObject(RideRequest::class.java)?.copy(id = snapshot.id)
                     val isDriver = request?.driverId == currentUserId
+                    val isFirstLoad = _uiState.value.rideRequest == null
+
+                    // Ini hanya berjalan sekali saat data pertama kali dimuat untuk memastikan rute langsung tampil.
+                    if (isFirstLoad && request?.status == "accepted" && !request.encodedPolyline.isNullOrBlank()) {
+                        val initialPolyline = PolyUtil.decode(request.encodedPolyline)
+                        _uiState.update { it.copy(dynamicPolylinePoints = initialPolyline) }
+                    }
 
                     _uiState.update { it.copy(rideRequest = request, isDriver = isDriver) }
 
-                    // Panggil fungsi untuk update rute setiap ada perubahan data
+                    // Panggil fungsi untuk update rute dinamis setiap ada perubahan data
                     updateRouteBasedOnStatus()
 
                     loadOtherUserInfo(isDriver, request)
 
                     if (request?.status == "completed" && !isDriver) {
-                        viewModelScope.launch {
-                            _navEvent.emit(TripNavEvent.NavigateToTripCompleted(rideRequestId))
+                        val driverId = request.driverId
+                        if (driverId != null) {
+                            viewModelScope.launch {
+                                // Kirim event yang benar untuk navigasi ke halaman rating
+                                _navEvent.emit(TripNavEvent.NavigateToRatingScreen(driverId, rideRequestId))
+                            }
                         }
                     }
                 }
@@ -133,13 +144,10 @@ class TripViewModel(
                 } catch (e: Exception) {
                     Log.e("TripViewModel", "Failed to get directions", e)
                 }
-            } else {
-                _uiState.update { it.copy(dynamicPolylinePoints = emptyList()) }
             }
         }
     }
 
-    // Sisa ViewModel tidak berubah...
     private fun loadOtherUserInfo(isDriver: Boolean, rideRequest: RideRequest?) {
         viewModelScope.launch {
             if (rideRequest == null) return@launch

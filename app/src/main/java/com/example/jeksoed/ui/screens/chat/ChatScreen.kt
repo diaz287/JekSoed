@@ -1,11 +1,9 @@
-// main/java/com/example/jeksoed/ui/screens/chat/ChatScreen.kt
-
 package com.example.jeksoed.ui.screens.chat
 
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -32,7 +30,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
-import android.net.Uri
 import com.example.jeksoed.R
 import com.example.jeksoed.ui.theme.JekSoedTheme
 import com.google.firebase.Timestamp
@@ -41,8 +38,8 @@ import com.google.firebase.Timestamp
 @Composable
 fun ChatScreen(
     navController: NavController,
-    viewModel: ChatViewModel = viewModel(),
-    rideRequestId: String
+    rideRequestId: String,
+    viewModel: ChatViewModel = viewModel(factory = ChatViewModelFactory(rideRequestId))
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
@@ -53,7 +50,6 @@ fun ChatScreen(
         }
     )
 
-    // Auto-scroll ke bawah saat ada pesan baru
     LaunchedEffect(uiState.messages) {
         if (uiState.messages.isNotEmpty()) {
             listState.animateScrollToItem(uiState.messages.size - 1)
@@ -69,17 +65,18 @@ fun ChatScreen(
             )
         },
         bottomBar = {
-            MessageInput(
-                value = uiState.messageText,
-                isUploading = uiState.isUploading,
-                onValueChange = { viewModel.onMessageChanged(it) },
-                onSendClick = { viewModel.sendMessage() },
-                onAttachClick = {
-                    imagePickerLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                    )
-                }
-            )
+            // Bungkus MessageInput dengan Box yang memiliki imePadding
+            Box(modifier = Modifier.imePadding()) {
+                MessageInput(
+                    value = uiState.messageText,
+                    isUploading = uiState.isUploading,
+                    onValueChange = viewModel::onMessageChanged,
+                    onSendClick = viewModel::sendMessage,
+                    onAttachClick = {
+                        imagePickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }
+                )
+            }
         }
     ) { paddingValues ->
         LazyColumn(
@@ -103,13 +100,9 @@ fun ChatScreen(
     }
 }
 
-
-// --- COMPOSABLE BARU UNTUK TOP BAR ---
 @Composable
 fun ChatTopBar(name: String, photoUrl: String?, onBackClick: () -> Unit) {
-    Surface(
-        shadowElevation = 4.dp
-    ) {
+    Surface(shadowElevation = 4.dp) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -119,14 +112,16 @@ fun ChatTopBar(name: String, photoUrl: String?, onBackClick: () -> Unit) {
             IconButton(onClick = onBackClick) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
             }
-            // Ganti dengan Coil atau Glide untuk memuat gambar dari URL
-            Image(
-                painter = painterResource(id = R.drawable.person_icon),
+            // --- PERBAIKAN: Gunakan AsyncImage ---
+            AsyncImage(
+                model = photoUrl,
                 contentDescription = "Foto Profil",
+                placeholder = painterResource(id = R.drawable.person_icon),
+                error = painterResource(id = R.drawable.person_icon),
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(40.dp)
-                    .clip(CircleShape),
-                contentScale = ContentScale.Crop
+                    .clip(CircleShape)
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(text = name, fontWeight = FontWeight.SemiBold)
@@ -134,7 +129,6 @@ fun ChatTopBar(name: String, photoUrl: String?, onBackClick: () -> Unit) {
     }
 }
 
-// --- COMPOSABLE YANG DIPERBARUI UNTUK GELEMBUNG CHAT ---
 @Composable
 fun MessageBubble(
     message: Message,
@@ -156,18 +150,19 @@ fun MessageBubble(
         horizontalArrangement = arrangement,
         verticalAlignment = Alignment.Bottom
     ) {
-        // Tampilkan foto profil di kiri untuk pesan orang lain
         if (!isMyMessage) {
-            Image(
-                painter = painterResource(id = R.drawable.person_icon),
+            // --- PERBAIKAN: Gunakan AsyncImage ---
+            AsyncImage(
+                model = otherUserPhotoUrl,
                 contentDescription = "Foto Profil",
-                modifier = Modifier.size(24.dp).clip(CircleShape),
-                contentScale = ContentScale.Crop
+                placeholder = painterResource(id = R.drawable.person_icon),
+                error = painterResource(id = R.drawable.person_icon),
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(24.dp).clip(CircleShape)
             )
             Spacer(modifier = Modifier.width(8.dp))
         }
 
-        // Card gelembung chat
         Card(
             shape = bubbleShape,
             colors = CardDefaults.cardColors(containerColor = bubbleColor)
@@ -184,7 +179,7 @@ fun MessageBubble(
                         contentScale = ContentScale.Crop
                     )
                 }
-                else -> { // "text"
+                else -> {
                     Text(
                         text = message.text,
                         color = textColor,
@@ -194,14 +189,16 @@ fun MessageBubble(
             }
         }
 
-        // Tampilkan foto profil di kanan untuk pesan kita
         if (isMyMessage) {
             Spacer(modifier = Modifier.width(8.dp))
-            Image(
-                painter = painterResource(id = R.drawable.person_icon),
+            // --- PERBAIKAN: Gunakan AsyncImage ---
+            AsyncImage(
+                model = myPhotoUrl,
                 contentDescription = "Foto Profil",
-                modifier = Modifier.size(24.dp).clip(CircleShape),
-                contentScale = ContentScale.Crop
+                placeholder = painterResource(id = R.drawable.person_icon),
+                error = painterResource(id = R.drawable.person_icon),
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(24.dp).clip(CircleShape)
             )
         }
     }

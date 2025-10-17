@@ -1,5 +1,6 @@
 package com.example.jeksoed.ui.screens.auth
 
+import android.content.Context
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -8,14 +9,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,19 +39,55 @@ import androidx.navigation.compose.rememberNavController
 import com.example.jeksoed.navigation.Screen
 import com.example.jeksoed.ui.components.PrimaryButton
 import com.example.jeksoed.ui.theme.JekSoedTheme
-import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 
-// --- LANGKAH 1: DATA DASAR ---
-@OptIn(ExperimentalMaterial3Api::class)
+// =================================================================================
+// LANGKAH 1: DATA DASAR
+// =================================================================================
+
+// --- Smart Composable (Dengan ViewModel) ---
 @Composable
 fun RegisterDriverStep1Screen(navController: NavController, viewModel: RegisterDriverViewModel) {
+    RegisterDriverStep1ScreenUI(
+        name = viewModel.name,
+        nim = viewModel.nim,
+        email = viewModel.email,
+        phone = viewModel.phone,
+        licensePlate = viewModel.licensePlate,
+        password = viewModel.password,
+        onNameChange = { viewModel.name = it },
+        onNimChange = { viewModel.nim = it },
+        onEmailChange = { viewModel.email = it },
+        onPhoneChange = { viewModel.phone = it },
+        onLicensePlateChange = { viewModel.licensePlate = it },
+        onPasswordChange = { viewModel.password = it },
+        onNextClick = { navController.navigate(Screen.RegisterDriverStep2.route) },
+        onBackClick = { navController.popBackStack() },
+        onTncClick = { navController.navigate(Screen.Tnc.route) }
+    )
+}
+
+// --- Dumb Composable (Hanya Tampilan) ---
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RegisterDriverStep1ScreenUI(
+    name: String, nim: String, email: String, phone: String, licensePlate: String, password: String,
+    onNameChange: (String) -> Unit,
+    onNimChange: (String) -> Unit,
+    onEmailChange: (String) -> Unit,
+    onPhoneChange: (String) -> Unit,
+    onLicensePlateChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onNextClick: () -> Unit,
+    onBackClick: () -> Unit,
+    onTncClick: () -> Unit
+) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {},
                 navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
+                    IconButton(onClick = onBackClick) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
                     }
                 },
@@ -56,7 +96,11 @@ fun RegisterDriverStep1Screen(navController: NavController, viewModel: RegisterD
         }
     ) { innerPadding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 24.dp, vertical = 16.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
@@ -65,26 +109,22 @@ fun RegisterDriverStep1Screen(navController: NavController, viewModel: RegisterD
             }
             Spacer(modifier = Modifier.height(32.dp))
 
-            OutlinedTextField(value = viewModel.name, onValueChange = { viewModel.name = it }, label = { Text("Nama") }, placeholder = { Text("Masukan nama kamu") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(32.dp))
+            OutlinedTextField(value = name, onValueChange = onNameChange, label = { Text("Nama") }, placeholder = { Text("Masukan nama kamu") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(32.dp))
             Spacer(modifier = Modifier.height(16.dp))
-            OutlinedTextField(value = viewModel.nim, onValueChange = { viewModel.nim = it }, label = { Text("NIM") }, placeholder = { Text("Masukan NIM kamu") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(32.dp))
+            OutlinedTextField(value = nim, onValueChange = onNimChange, label = { Text("NIM") }, placeholder = { Text("Masukan NIM kamu") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(32.dp))
             Spacer(modifier = Modifier.height(16.dp))
-            OutlinedTextField(value = viewModel.email, onValueChange = { viewModel.email = it }, label = { Text("Email") }, placeholder = { Text("Masukan email kamu") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(32.dp))
+            OutlinedTextField(value = email, onValueChange = onEmailChange, label = { Text("Email") }, placeholder = { Text("Masukan email kamu") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(32.dp))
             Spacer(modifier = Modifier.height(16.dp))
-            OutlinedTextField(value = viewModel.phone, onValueChange = { viewModel.phone = it }, label = { Text("Nomor Hp") }, placeholder = { Text("Masukan nomor hp kamu") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(32.dp))
+            OutlinedTextField(value = phone, onValueChange = onPhoneChange, label = { Text("Nomor Hp") }, placeholder = { Text("Masukan nomor hp kamu") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(32.dp))
             Spacer(modifier = Modifier.height(16.dp))
-            OutlinedTextField(value = viewModel.password, onValueChange = { viewModel.password = it }, label = { Text("Password") }, placeholder = { Text("Masukan password kamu") }, modifier = Modifier.fillMaxWidth(), visualTransformation = PasswordVisualTransformation(), shape = RoundedCornerShape(32.dp))
+            OutlinedTextField(value = licensePlate, onValueChange = onLicensePlateChange, label = { Text("Plat Nomor") }, placeholder = { Text("Contoh: R 1234 AB") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(32.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+            OutlinedTextField(value = password, onValueChange = onPasswordChange, label = { Text("Password") }, placeholder = { Text("Masukan password kamu") }, modifier = Modifier.fillMaxWidth(), visualTransformation = PasswordVisualTransformation(), shape = RoundedCornerShape(32.dp))
             Spacer(modifier = Modifier.height(32.dp))
 
-            PrimaryButton(
-                text = "Lanjut",
-                onClick = { navController.navigate(Screen.RegisterDriverStep2.route) },
-                containerColor = Color(0xFFFFC107),
-                contentColor = Color.Black
-            )
+            PrimaryButton(text = "Lanjut", onClick = onNextClick, containerColor = Color(0xFFFFC107), contentColor = Color.Black)
             Spacer(modifier = Modifier.weight(1f))
 
-            // Syarat & Ketentuan
             val tncAnnotatedString = buildAnnotatedString {
                 append("Aku setuju sama ")
                 pushStringAnnotation(tag = "TNC", annotation = "tnc_link")
@@ -98,30 +138,56 @@ fun RegisterDriverStep1Screen(navController: NavController, viewModel: RegisterD
                 style = MaterialTheme.typography.bodySmall.copy(textAlign = TextAlign.Center, color = Color.Gray),
                 onClick = { offset ->
                     tncAnnotatedString.getStringAnnotations(tag = "TNC", start = offset, end = offset)
-                        .firstOrNull()?.let { navController.navigate(Screen.Tnc.route) }
+                        .firstOrNull()?.let { onTncClick() }
                 }
             )
         }
     }
 }
 
-// --- LANGKAH 2: UNGGAH DOKUMEN ---
-@OptIn(ExperimentalMaterial3Api::class)
+// =================================================================================
+// LANGKAH 2: UNGGAH DOKUMEN
+// =================================================================================
+
+// --- Smart Composable (Dengan ViewModel) ---
 @Composable
 fun RegisterDriverStep2Screen(navController: NavController, viewModel: RegisterDriverViewModel) {
     val context = LocalContext.current
-
-    // Launcher untuk memilih file gambar
     val ktmLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.GetContent()) { uri: Uri? -> viewModel.ktmUri = uri }
     val stnkLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.GetContent()) { uri: Uri? -> viewModel.stnkUri = uri }
     val motorLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.GetContent()) { uri: Uri? -> viewModel.motorUri = uri }
 
+    RegisterDriverStep2ScreenUI(
+        ktmFileName = viewModel.getFileName(viewModel.ktmUri, context),
+        stnkFileName = viewModel.getFileName(viewModel.stnkUri, context),
+        motorFileName = viewModel.getFileName(viewModel.motorUri, context),
+        onKtmClick = { ktmLauncher.launch("image/*") },
+        onStnkClick = { stnkLauncher.launch("image/*") },
+        onMotorClick = { motorLauncher.launch("image/*") },
+        onNextClick = { navController.navigate(Screen.RegisterDriverStep3.route) },
+        onBackClick = { navController.popBackStack() },
+        onTncClick = { navController.navigate(Screen.Tnc.route) }
+    )
+}
+
+// --- Dumb Composable (Hanya Tampilan) ---
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RegisterDriverStep2ScreenUI(
+    ktmFileName: String, stnkFileName: String, motorFileName: String,
+    onKtmClick: () -> Unit,
+    onStnkClick: () -> Unit,
+    onMotorClick: () -> Unit,
+    onNextClick: () -> Unit,
+    onBackClick: () -> Unit,
+    onTncClick: () -> Unit
+) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {},
                 navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
+                    IconButton(onClick = onBackClick) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
                     }
                 },
@@ -135,22 +201,16 @@ fun RegisterDriverStep2Screen(navController: NavController, viewModel: RegisterD
             Text(text = "Lengkapin dulu, Bung!", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(32.dp))
 
-            FileUploadField(label = "KTM", fileName = viewModel.getFileName(viewModel.ktmUri, context)) { ktmLauncher.launch("image/*") }
+            FileUploadField(label = "KTM", fileName = ktmFileName, onClick = onKtmClick)
             Spacer(modifier = Modifier.height(16.dp))
-            FileUploadField(label = "STNK", fileName = viewModel.getFileName(viewModel.stnkUri, context)) { stnkLauncher.launch("image/*") }
+            FileUploadField(label = "STNK", fileName = stnkFileName, onClick = onStnkClick)
             Spacer(modifier = Modifier.height(16.dp))
-            FileUploadField(label = "Motor (Plat terlihat)", fileName = viewModel.getFileName(viewModel.motorUri, context)) { motorLauncher.launch("image/*") }
+            FileUploadField(label = "Motor (Plat terlihat)", fileName = motorFileName, onClick = onMotorClick)
             Spacer(modifier = Modifier.height(32.dp))
-            PrimaryButton(
-                text = "Lanjut",
-                onClick = { navController.navigate(Screen.RegisterDriverStep3.route) },
-                containerColor = Color(0xFFFFC107),
-                contentColor = Color.Black
-            )
+            PrimaryButton(text = "Lanjut", onClick = onNextClick, containerColor = Color(0xFFFFC107), contentColor = Color.Black)
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // Syarat & Ketentuan
             val tncAnnotatedString = buildAnnotatedString {
                 append("Aku setuju sama ")
                 pushStringAnnotation(tag = "TNC", annotation = "tnc_link")
@@ -164,26 +224,64 @@ fun RegisterDriverStep2Screen(navController: NavController, viewModel: RegisterD
                 style = MaterialTheme.typography.bodySmall.copy(textAlign = TextAlign.Center, color = Color.Gray),
                 onClick = { offset ->
                     tncAnnotatedString.getStringAnnotations(tag = "TNC", start = offset, end = offset)
-                        .firstOrNull()?.let { navController.navigate(Screen.Tnc.route) }
+                        .firstOrNull()?.let { onTncClick() }
                 }
             )
         }
     }
 }
 
-// --- LANGKAH 3: KONFIRMASI ---
-@OptIn(ExperimentalMaterial3Api::class)
+// =================================================================================
+// LANGKAH 3: KONFIRMASI
+// =================================================================================
+
+// --- Smart Composable (Dengan ViewModel) ---
 @Composable
 fun RegisterDriverStep3Screen(navController: NavController, viewModel: RegisterDriverViewModel) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
+    RegisterDriverStep3ScreenUI(
+        agreedToTerms = viewModel.agreedToTerms,
+        isLoading = viewModel.isLoading,
+        onAgreementChange = { viewModel.agreedToTerms = it },
+        onRegisterClick = {
+            scope.launch {
+                viewModel.registerDriver(
+                    onSuccess = {
+                        Toast.makeText(context, "Registrasi Driver Berhasil!", Toast.LENGTH_LONG).show()
+                        navController.navigate(Screen.Cta.route) {
+                            popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                        }
+                    },
+                    onFailure = { errorMessage ->
+                        Toast.makeText(context, "Error: $errorMessage", Toast.LENGTH_LONG).show()
+                    }
+                )
+            }
+        },
+        onBackClick = { navController.popBackStack() },
+        onTncClick = { navController.navigate(Screen.Tnc.route) }
+    )
+}
+
+// --- Dumb Composable (Hanya Tampilan) ---
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RegisterDriverStep3ScreenUI(
+    agreedToTerms: Boolean,
+    isLoading: Boolean,
+    onAgreementChange: (Boolean) -> Unit,
+    onRegisterClick: () -> Unit,
+    onBackClick: () -> Unit,
+    onTncClick: () -> Unit
+) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {},
                 navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
+                    IconButton(onClick = onBackClick) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
                     }
                 },
@@ -208,37 +306,27 @@ fun RegisterDriverStep3Screen(navController: NavController, viewModel: RegisterD
             Spacer(modifier = Modifier.height(24.dp))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.clickable { viewModel.agreedToTerms = !viewModel.agreedToTerms }
+                modifier = Modifier.clickable { onAgreementChange(!agreedToTerms) }
             ) {
-                Checkbox(checked = viewModel.agreedToTerms, onCheckedChange = { viewModel.agreedToTerms = it })
+                Checkbox(checked = agreedToTerms, onCheckedChange = onAgreementChange)
                 Text("Saya setuju dengan persyaratan yang di berikan")
             }
             Spacer(modifier = Modifier.height(32.dp))
-            PrimaryButton(
-                text = "Daftar",
-                onClick = {
-                    scope.launch {
-                        viewModel.registerDriver(
-                            onSuccess = {
-                                Toast.makeText(context, "Registrasi Driver Berhasil!", Toast.LENGTH_LONG).show()
-                                // Navigasi ke CTA dan hapus semua backstack
-                                navController.navigate(Screen.Cta.route) {
-                                    popUpTo(navController.graph.startDestinationId) { inclusive = true }
-                                }
-                            },
-                            onFailure = { errorMessage ->
-                                Toast.makeText(context, "Error: $errorMessage", Toast.LENGTH_LONG).show()
-                            }
-                        )
-                    }
-                },
-                containerColor = Color(0xFFFFC107),
-                contentColor = Color.Black,
-                isEnabled = viewModel.agreedToTerms
-            )
+
+            if (isLoading) {
+                CircularProgressIndicator()
+            } else {
+                PrimaryButton(
+                    text = "Daftar",
+                    onClick = onRegisterClick,
+                    containerColor = Color(0xFFFFC107),
+                    contentColor = Color.Black,
+                    isEnabled = agreedToTerms
+                )
+            }
+
             Spacer(modifier = Modifier.weight(1f))
 
-            // Syarat & Ketentuan
             val tncAnnotatedString = buildAnnotatedString {
                 append("Aku setuju sama ")
                 pushStringAnnotation(tag = "TNC", annotation = "tnc_link")
@@ -252,13 +340,12 @@ fun RegisterDriverStep3Screen(navController: NavController, viewModel: RegisterD
                 style = MaterialTheme.typography.bodySmall.copy(textAlign = TextAlign.Center, color = Color.Gray),
                 onClick = { offset ->
                     tncAnnotatedString.getStringAnnotations(tag = "TNC", start = offset, end = offset)
-                        .firstOrNull()?.let { navController.navigate(Screen.Tnc.route) }
+                        .firstOrNull()?.let { onTncClick() }
                 }
             )
         }
     }
 }
-
 
 // Composable bantuan untuk field upload file
 @Composable
@@ -300,12 +387,19 @@ private fun FileUploadField(label: String, fileName: String, onClick: () -> Unit
     }
 }
 
+// =================================================================================
+// PREVIEWS (Sekarang memanggil versi UI)
+// =================================================================================
+
 @Preview(showSystemUi = true, showBackground = true)
 @Composable
 fun RegisterDriverStep1ScreenPreview() {
     JekSoedTheme {
-        // Kita menggunakan NavController palsu untuk preview
-        RegisterDriverStep1Screen(navController = rememberNavController(), viewModel = RegisterDriverViewModel())
+        RegisterDriverStep1ScreenUI(
+            name = "", nim = "", email = "", phone = "", licensePlate = "", password = "",
+            onNameChange = {}, onNimChange = {}, onEmailChange = {}, onPhoneChange = {}, onLicensePlateChange = {}, onPasswordChange = {},
+            onNextClick = {}, onBackClick = {}, onTncClick = {}
+        )
     }
 }
 
@@ -313,7 +407,11 @@ fun RegisterDriverStep1ScreenPreview() {
 @Composable
 fun RegisterDriverStep2ScreenPreview() {
     JekSoedTheme {
-        RegisterDriverStep2Screen(navController = rememberNavController(), viewModel = RegisterDriverViewModel())
+        RegisterDriverStep2ScreenUI(
+            ktmFileName = "ktm_saya.jpg", stnkFileName = "stnk_motor.png", motorFileName = "Belum ada foto yang dipilih",
+            onKtmClick = {}, onStnkClick = {}, onMotorClick = {},
+            onNextClick = {}, onBackClick = {}, onTncClick = {}
+        )
     }
 }
 
@@ -321,6 +419,9 @@ fun RegisterDriverStep2ScreenPreview() {
 @Composable
 fun RegisterDriverStep3ScreenPreview() {
     JekSoedTheme {
-        RegisterDriverStep3Screen(navController = rememberNavController(), viewModel = RegisterDriverViewModel())
+        RegisterDriverStep3ScreenUI(
+            agreedToTerms = true, isLoading = false,
+            onAgreementChange = {}, onRegisterClick = {}, onBackClick = {}, onTncClick = {}
+        )
     }
 }

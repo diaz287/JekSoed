@@ -1,5 +1,3 @@
-// main/java/com/example/jeksoed/ui/screens/trip/TripCompletedScreen.kt
-
 package com.example.jeksoed.ui.screens.trip
 
 import android.widget.Toast
@@ -38,6 +36,8 @@ import com.example.jeksoed.utils.formatCurrency
 fun TripCompletedScreen(
     navController: NavController,
     rideRequestId: String,
+    // --- PERBAIKAN: Gunakan viewModel() standar ---
+    // ViewModel akan secara otomatis menerima SavedStateHandle yang benar
     viewModel: TripCompletedViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -47,9 +47,10 @@ fun TripCompletedScreen(
         formattedDate = viewModel.getFormattedDate(uiState.rideRequest?.createdAt),
         onFeedbackChange = viewModel::onFeedbackChanged,
         onFinishClick = {
-            viewModel.submitAndFinish()
-            navController.navigate(Screen.DriverMain.route) {
-                popUpTo(navController.graph.startDestinationId) { inclusive = true }
+            viewModel.finishTripAndUpdateBalance {
+                navController.navigate(Screen.DriverMain.route) {
+                    popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                }
             }
         }
     )
@@ -92,8 +93,9 @@ private fun TripCompletedScreenUI(
             Spacer(modifier = Modifier.height(24.dp))
 
             PrimaryButton(
-                text = "Selesai",
+                text = if (uiState.isSubmitting) "Menyelesaikan..." else "Selesai",
                 onClick = onFinishClick,
+                isEnabled = !uiState.isSubmitting,
                 containerColor = Color(0xFFFFC107),
                 contentColor = Color.Black
             )
@@ -103,7 +105,6 @@ private fun TripCompletedScreenUI(
 
 @Composable
 private fun RideSummaryCard(uiState: TripCompletedUiState, formattedDate: String) {
-    // --- TAMBAHKAN INI untuk manajemen clipboard ---
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
     val orderNumber = uiState.rideRequest?.id?.take(8) ?: "JR-FN-00001"
@@ -123,11 +124,10 @@ private fun RideSummaryCard(uiState: TripCompletedUiState, formattedDate: String
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically // Pastikan alignment vertikal
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(formattedDate, fontSize = 12.sp, color = Color.Gray)
 
-                // --- PERUBAHAN DI SINI: Baris Nomor Pesanan ---
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -137,10 +137,10 @@ private fun RideSummaryCard(uiState: TripCompletedUiState, formattedDate: String
                                 .makeText(context, "No. Pesanan disalin!", Toast.LENGTH_SHORT)
                                 .show()
                         }
-                        .padding(4.dp) // Beri padding agar area klik lebih besar
+                        .padding(4.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.ContentCopy, // Ikon Salin
+                        imageVector = Icons.Default.ContentCopy,
                         contentDescription = "Salin Nomor Pesanan",
                         modifier = Modifier.size(14.dp),
                         tint = Color.Gray
@@ -164,8 +164,6 @@ private fun RideSummaryCard(uiState: TripCompletedUiState, formattedDate: String
         }
     }
 }
-
-// --- Composable lain di bawah ini tidak ada perubahan ---
 
 @Composable
 private fun PaymentRow(label: String, value: String, isHighlighted: Boolean = false, isBold: Boolean = false) {

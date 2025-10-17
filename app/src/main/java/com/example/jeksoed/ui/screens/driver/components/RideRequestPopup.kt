@@ -1,10 +1,6 @@
-// main/java/com/example/jeksoed/ui/screens/driver/components/RideRequestPopup.kt
-
 package com.example.jeksoed.ui.screens.driver.components
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -25,22 +21,20 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.jeksoed.R
 import com.example.jeksoed.data.model.RideRequest
-import com.example.jeksoed.ui.screens.driver.PassengerInfo
+import com.example.jeksoed.ui.screens.driver.PassengerInfo // Mengimpor dari AllOrdersScreen
 import com.example.jeksoed.ui.theme.JekSoedTheme
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.tasks.await
 
-data class PassengerInfo(
-    val name: String = "Penumpang",
-    val photoUrl: String? = null
-)
+// --- DATA CLASS DUPLIKAT DIHAPUS DARI SINI ---
+
 @Composable
 fun RideRequestPopup(
     rideRequest: RideRequest,
-    onAccept: (String) -> Unit,
-    onReject: (String) -> Unit,
+    onAccept: () -> Unit,
+    onReject: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val passengerInfo by produceState(initialValue = PassengerInfo(), rideRequest.passengerId) {
@@ -57,9 +51,8 @@ fun RideRequestPopup(
         Column(modifier = Modifier.padding(16.dp)) {
             // Bagian Info Penumpang dan Rute
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Ganti dengan gambar profil penumpang jika ada
                 AsyncImage(
-                    model = passengerInfo.photoUrl, // <-- DIUBAH DARI profilePictureUrl
+                    model = passengerInfo.photoUrl,
                     contentDescription = "Foto Penumpang",
                     placeholder = painterResource(id = R.drawable.person_icon),
                     error = painterResource(id = R.drawable.person_icon),
@@ -70,13 +63,13 @@ fun RideRequestPopup(
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    // Ganti dengan nama penumpang jika ada
                     Text(passengerInfo.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     Spacer(modifier = Modifier.height(8.dp))
-                    // Rute
-                    RouteInfoRow(iconRes = R.drawable.blue_icon, location = "FK Unsoed") // Ganti dengan data asli
+
+                    // --- PERBAIKAN: Gunakan data dinamis ---
+                    RouteInfoRow(iconRes = R.drawable.blue_icon, location = rideRequest.pickupName ?: "Lokasi Jemput")
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp, horizontal = 8.dp))
-                    RouteInfoRow(iconRes = R.drawable.locatio_icon, location = "Rumah Sakit Wiradadi") // Ganti dengan data asli
+                    RouteInfoRow(iconRes = R.drawable.locatio_icon, location = rideRequest.destinationName ?: "Lokasi Tujuan")
                 }
             }
 
@@ -88,7 +81,7 @@ fun RideRequestPopup(
                 horizontalArrangement = Arrangement.End
             ) {
                 Button(
-                    onClick = { onReject(rideRequest.id) },
+                    onClick = onReject,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFDE0E0)),
                     shape = RoundedCornerShape(50)
                 ) {
@@ -103,12 +96,12 @@ fun RideRequestPopup(
                 Spacer(modifier = Modifier.width(8.dp))
 
                 Button(
-                    onClick = { onAccept(rideRequest.id) },
+                    onClick = onAccept,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDFF9E9)),
                     shape = RoundedCornerShape(50)
                 ) {
                     Icon(
-                        painter = painterResource(id = R.drawable.check), // Pastikan Anda punya drawable 'check'
+                        painter = painterResource(id = R.drawable.check),
                         contentDescription = "Terima",
                         tint = Color(0xFF219800)
                     )
@@ -138,21 +131,13 @@ private fun RouteInfoRow(iconRes: Int, location: String) {
         )
     }
 }
-private suspend fun getPassengerName(passengerId: String): String {
-    if (passengerId.isBlank()) return "Penumpang"
-    return try {
-        val document = Firebase.firestore.collection("users").document(passengerId).get().await()
-        document.getString("nama") ?: "Penumpang"
-    } catch (e: Exception) {
-        "Penumpang"
-    }
-}
-private suspend fun getPassengerInfo(passengerId: String): com.example.jeksoed.ui.screens.driver.PassengerInfo {
+
+private suspend fun getPassengerInfo(passengerId: String): PassengerInfo {
     if (passengerId.isBlank()) return PassengerInfo()
     return try {
         val document = Firebase.firestore.collection("users").document(passengerId).get().await()
         val name = document.getString("nama") ?: "Penumpang"
-        val photoUrl = document.getString("photoUrl") // <-- DIUBAH DARI profilePictureUrl
+        val photoUrl = document.getString("photoUrl")
         PassengerInfo(name, photoUrl)
     } catch (e: Exception) {
         PassengerInfo()
@@ -162,13 +147,13 @@ private suspend fun getPassengerInfo(passengerId: String): com.example.jeksoed.u
 @Preview(name = "Ride Request Notification Popup", showBackground = true)
 @Composable
 private fun RideRequestPopupPreview() {
-    // Kita buat data palsu (dummy) untuk ditampilkan di preview
     val dummyRideRequest = RideRequest(
         id = "dummy123",
         passengerId = "passengerXYZ",
         status = "pending",
-        createdAt = Timestamp.now()
-        // Anda bisa menambahkan data lokasi palsu jika diperlukan
+        createdAt = Timestamp.now(),
+        pickupName = "Fakultas Kedokteran",
+        destinationName = "GOR Satria"
     )
 
     JekSoedTheme {

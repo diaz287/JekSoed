@@ -1,5 +1,3 @@
-// main/java/com/example/jeksoed/ui/screens/rating/RatingScreen.kt
-
 package com.example.jeksoed.ui.screens.rating
 
 import androidx.compose.foundation.Image
@@ -17,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -24,42 +23,59 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.example.jeksoed.R
+import com.example.jeksoed.data.model.RideRequest
+import com.example.jeksoed.data.model.User
 import com.example.jeksoed.navigation.Screen
 import com.example.jeksoed.ui.components.PrimaryButton
 import com.example.jeksoed.ui.theme.JekSoedTheme
-import com.example.jeksoed.utils.formatCurrency
 
+// --- Smart Composable ---
 @Composable
 fun RatingScreen(
     navController: NavController,
-    viewModel: RatingViewModel = viewModel(),
     driverId: String,
+    rideRequestId: String
 ) {
+    // --- PERBAIKAN: Hapus factory dari pemanggilan viewModel() ---
+    val viewModel: RatingViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsState()
     var showDialog by remember { mutableStateOf(false) }
 
-    RatingScreenUI(
-        uiState = uiState,
-        onRatingChange = viewModel::onRatingChanged,
-        onCommentChange = viewModel::onCommentChanged,
-        onSubmitClick = {
-            viewModel.submitRating()
-            showDialog = true // Tampilkan dialog setelah submit
+    if (uiState.isLoading) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
         }
-    )
+    } else {
+        RatingScreenUI(
+            uiState = uiState,
+            onRatingChange = viewModel::onRatingChanged,
+            onCommentChange = viewModel::onCommentChanged,
+            onSubmitClick = {
+                viewModel.submitRating()
+                showDialog = true
+            }
+        )
+    }
 
     if (showDialog) {
         TripFinishedDialog(onDismiss = {
             showDialog = false
-            // Navigasi ke home setelah dialog ditutup
             navController.navigate(Screen.PassengerMain.route) {
-                popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                // Hapus semua layar di atas PassengerMainScreen dari back stack
+                popUpTo(Screen.PassengerMain.route) {
+                    inclusive = true
+                }
+                // Pastikan tidak ada duplikat HomeScreen di tumpukan
+                launchSingleTop = true
             }
         })
     }
 }
 
+
+// --- Dumb Composable ---
 @Composable
 private fun RatingScreenUI(
     uiState: RatingUiState,
@@ -78,15 +94,22 @@ private fun RatingScreenUI(
         Text("Kamu udah sampai di tujuanmu", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Driver Info
-        Image(painter = painterResource(id = R.drawable.person_icon), contentDescription = "Foto Driver", modifier = Modifier.size(80.dp).clip(CircleShape))
+        // Info Driver Dinamis
+        AsyncImage(
+            model = uiState.driver?.photoUrl,
+            contentDescription = "Foto Driver",
+            placeholder = painterResource(id = R.drawable.person_icon),
+            error = painterResource(id = R.drawable.person_icon),
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.size(80.dp).clip(CircleShape)
+        )
         Spacer(modifier = Modifier.height(8.dp))
-        Text("Fajar Nugros", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) // Ganti nama asli
-        Text("R 6666 CA", color = Color.Gray) // Ganti plat asli
+        Text(uiState.driver?.nama ?: "Driver", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(uiState.driver?.licensePlate ?: "...", color = Color.Gray)
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Rute & Pembayaran
-        RouteAndPayment()
+        // Rute & Pembayaran Dinamis
+        RouteAndPayment(ride = uiState.rideRequest)
         Spacer(modifier = Modifier.height(32.dp))
 
         // Rating
@@ -114,22 +137,22 @@ private fun RatingScreenUI(
 }
 
 @Composable
-private fun RouteAndPayment() {
+private fun RouteAndPayment(ride: RideRequest?) {
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(painter = painterResource(id = R.drawable.blue_icon), contentDescription = null, tint = Color.Unspecified)
             Spacer(modifier = Modifier.width(8.dp))
-            Text("FK Unsoed")
+            Text(ride?.pickupName ?: "Lokasi Jemput")
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(painter = painterResource(id = R.drawable.locatio_icon), contentDescription = null, tint = Color.Unspecified)
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Rumah Sakit Wiradadi")
+            Text(ride?.destinationName ?: "Lokasi Tujuan")
         }
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("Total pembayaran", color = Color.Gray)
-            Text(formatCurrency(10000), fontWeight = FontWeight.Bold)
+            Text(ride?.price ?: "Rp0", fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -167,6 +190,15 @@ fun TripFinishedDialog(onDismiss: () -> Unit) {
 @Composable
 private fun RatingScreenPassengerPreview() {
     JekSoedTheme {
-        RatingScreenUI(uiState = RatingUiState(selectedRating = 4), onRatingChange = {}, onCommentChange = {}, onSubmitClick = {})
+        RatingScreenUI(
+            uiState = RatingUiState(
+                selectedRating = 4,
+                driver = User(nama = "Fajar Nugros", licensePlate = "R 6666 CA"),
+                rideRequest = RideRequest(pickupName = "FK Unsoed", destinationName = "RS Wiradadi", price = "Rp10.000")
+            ),
+            onRatingChange = {},
+            onCommentChange = {},
+            onSubmitClick = {}
+        )
     }
 }

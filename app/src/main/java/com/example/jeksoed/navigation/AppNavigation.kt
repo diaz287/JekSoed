@@ -33,6 +33,7 @@ import com.example.jeksoed.ui.screens.auth.RegisterDriverStep1Screen
 import com.example.jeksoed.ui.screens.auth.RegisterDriverStep2Screen
 import com.example.jeksoed.ui.screens.auth.RegisterDriverStep3Screen
 import com.example.jeksoed.ui.screens.auth.RegisterDriverViewModel
+import com.example.jeksoed.ui.screens.chat.ChatViewModelFactory
 import com.example.jeksoed.ui.screens.driver.AllOrdersScreen
 import com.example.jeksoed.ui.screens.driver.DriverHomeViewModel
 import com.example.jeksoed.ui.screens.driver.DriverMainScreen
@@ -67,8 +68,8 @@ sealed class Screen(val route: String) {
         fun createRoute(rideRequestId: String) = "trip_completed/$rideRequestId"
     }
 
-    object Rating : Screen("rating/{driverId}") {
-        fun createRoute(driverId: String) = "rating/$driverId"
+    object Rating : Screen("rating/{driverId}/{rideRequestId}") {
+        fun createRoute(driverId: String, rideRequestId: String) = "rating/$driverId/$rideRequestId"
     }
     object Chat : Screen("chat/{rideRequestId}") {
         fun createRoute(rideRequestId: String) = "chat/$rideRequestId"
@@ -108,7 +109,6 @@ fun AppNavigation() {
         // --- TAMBAHKAN NESTED NAVIGATION GRAPH UNTUK REGISTRASI DRIVER ---
         driverRegistrationGraph(navController)
 
-        // --- BLOK YANG DIDUPLIKASI DAN SALAH SUDAH DIHAPUS ---
 
         composable(Screen.PassengerMain.route) { PassengerMainScreen(navController) }
         composable(Screen.DriverMain.route) {
@@ -170,16 +170,26 @@ fun AppNavigation() {
         composable(
             route = Screen.Rating.route,
             arguments = listOf(
-                navArgument("driverId") { type = NavType.StringType }
+                navArgument("driverId") { type = NavType.StringType },
+                navArgument("rideRequestId") { type = NavType.StringType } // Tambahkan argumen ini
             )
         ) { backStackEntry ->
             val driverId = backStackEntry.arguments?.getString("driverId")!!
-            RatingScreen(navController = navController, driverId = driverId)
+            val rideRequestId = backStackEntry.arguments?.getString("rideRequestId")!! // Ambil argumen
+            RatingScreen(
+                navController = navController,
+                driverId = driverId,
+                rideRequestId = rideRequestId // Teruskan ke screen
+            )
         }
         composable(Screen.Chat.route) { backStackEntry ->
             val rideRequestId = backStackEntry.arguments?.getString("rideRequestId")
             if (rideRequestId != null) {
-                ChatScreen(navController = navController,rideRequestId = rideRequestId)
+                ChatScreen(
+                    navController = navController,
+                    rideRequestId = rideRequestId,
+                    viewModel = viewModel(factory = ChatViewModelFactory(rideRequestId))
+                )
             }
         }
         composable(

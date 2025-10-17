@@ -40,10 +40,9 @@ data class ChatUiState(
 )
 
 class ChatViewModel(
-    savedStateHandle: SavedStateHandle
+    private val rideRequestId: String
 ) : ViewModel() {
 
-    private val rideRequestId: String = savedStateHandle.get<String>("rideRequestId")!!
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
     private val storage = FirebaseStorage.getInstance()
@@ -119,7 +118,8 @@ class ChatViewModel(
         val message = hashMapOf(
             "text" to textToSend,
             "senderId" to currentUserId,
-            "timestamp" to Timestamp.now()
+            "timestamp" to Timestamp.now(),
+            "type" to "text"
         )
         db.collection("chats").document(rideRequestId).collection("messages").add(message)
 

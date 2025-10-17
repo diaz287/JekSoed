@@ -15,6 +15,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
@@ -164,35 +167,37 @@ fun CtaScreen(navController: NavController) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        val annotatedString = buildAnnotatedString {
+        val annotatedText = buildAnnotatedString {
             append("Masuk atau daftar artinya kamu udah oke dan setuju sama ")
-            pushStringAnnotation(tag = "TNC", annotation = "tnc_link")
-            withStyle(
-                style = SpanStyle(
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                    fontStyle = FontStyle.Normal // Secara eksplisit set ke Normal
+
+            withLink(
+                LinkAnnotation.Clickable(
+                    tag = "TNC",
+                    linkInteractionListener = {
+                        navController.navigate(Screen.Tnc.route)
+                    }
                 )
             ) {
-                append("Syarat & Ketentuan")
+                withStyle(
+                    style = SpanStyle(
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                ) {
+                    append("Syarat & Ketentuan")
+                }
             }
-            pop()
+
             append(" Privasi kita.")
         }
-        ClickableText(
-            text = annotatedString,
+
+        Text(
+            text = annotatedText,
             style = MaterialTheme.typography.bodySmall.copy(
                 textAlign = TextAlign.Center,
                 color = Color.Gray
             ),
-            onClick = { offset ->
-                // Cek apakah klik berada di dalam area anotasi "TNC"
-                annotatedString.getStringAnnotations(tag = "TNC", start = offset, end = offset)
-                    .firstOrNull()?.let {
-                        // Jika ya, navigasi ke halaman TNC
-                        navController.navigate(Screen.Tnc.route)
-                    }
-            }
+            modifier = Modifier.fillMaxWidth()
         )
     }
 }

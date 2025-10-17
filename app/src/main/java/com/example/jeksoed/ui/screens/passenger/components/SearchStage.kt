@@ -1,5 +1,6 @@
 package com.example.jeksoed.ui.screens.passenger.components
 
+import android.content.Context
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,7 +11,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -40,8 +41,10 @@ fun SearchStage(
     uiState: OrderUiState,
     viewModel: OrderViewModel?,
     placesClient: PlacesClient?,
-    // --- TAMBAHKAN PARAMETER BARU ---
-    onTextFieldFocus: () -> Unit
+    onTextFieldFocus: () -> Unit,
+    // --- TAMBAHKAN DUA PARAMETER INI ---
+    context: Context,
+    apiKey: String
 ) {
     val focusManager = LocalFocusManager.current
 
@@ -53,17 +56,14 @@ fun SearchStage(
                     onQueryChange = { query -> placesClient?.let { viewModel?.onPickupQueryChange(query, it) } },
                     onClear = { viewModel?.clearQuery(isPickup = true) },
                     onFocusChanged = { isFocused ->
-                        // --- PANGGIL FUNGSI EXPAND SAAT FOKUS ---
                         if (isFocused) onTextFieldFocus()
-
-                        // Logika yang sudah ada
                         if (isFocused && uiState.pickupQuery == "Lokasi saat ini") {
                             viewModel?.clearQuery(isPickup = true)
                         }
                     },
                     placeholder = "Lokasi Jemput",
                     onLocationClick = {
-                        viewModel?.setUserLocationAsPickup(uiState.pickupLocation ?: com.google.android.gms.maps.model.LatLng(0.0, 0.0))
+                        viewModel?.userLocation?.value?.let { viewModel.setUserLocationAsPickup(it) }
                     }
                 )
                 HorizontalDivider(
@@ -74,10 +74,7 @@ fun SearchStage(
                     query = uiState.destinationQuery,
                     onQueryChange = { query -> placesClient?.let { viewModel?.onDestinationQueryChange(query, it) } },
                     onClear = { viewModel?.clearQuery(isPickup = false) },
-                    onFocusChanged = { isFocused ->
-                        // --- PANGGIL FUNGSI EXPAND SAAT FOKUS ---
-                        if (isFocused) onTextFieldFocus()
-                    },
+                    onFocusChanged = { isFocused -> if (isFocused) onTextFieldFocus() },
                     placeholder = "Mau ke mana, nih?",
                     onLocationClick = {}
                 )
@@ -90,7 +87,8 @@ fun SearchStage(
                     PredictionItem(prediction = prediction) {
                         focusManager.clearFocus()
                         if (placesClient != null) {
-                            viewModel?.selectPrediction(prediction, placesClient)
+                            // --- PERBAIKAN: Tambahkan context dan apiKey ---
+                            viewModel?.selectPrediction(prediction, placesClient, context, apiKey)
                         }
                     }
                 }
@@ -271,7 +269,9 @@ private fun SearchStagePreview() {
             ),
             viewModel = null,
             placesClient = null,
-            onTextFieldFocus = {}
+            onTextFieldFocus = {},
+            context = LocalContext.current,
+            apiKey = ""
         )
     }
 }
@@ -287,7 +287,9 @@ private fun SearchStage_CustomPickupPreview() {
             ),
             viewModel = null,
             placesClient = null,
-            onTextFieldFocus = {}
+            onTextFieldFocus = {},
+            context = LocalContext.current,
+            apiKey = ""
         )
     }
 }
@@ -304,7 +306,9 @@ private fun SearchStage_TypingPreview() {
             ),
             viewModel = null,
             placesClient = null,
-            onTextFieldFocus = {}
+            onTextFieldFocus = {},
+            context = LocalContext.current,
+            apiKey = ""
         )
     }
 }

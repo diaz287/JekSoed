@@ -2,7 +2,6 @@ package com.example.jeksoed.ui.screens.passenger
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
@@ -22,6 +21,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -32,25 +32,24 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.example.jeksoed.R
+import com.example.jeksoed.navigation.Screen
+import com.example.jeksoed.ui.screens.passenger.components.OrderSheetContent
+import com.example.jeksoed.ui.screens.passenger.components.SearchStage
 import com.example.jeksoed.ui.theme.JekSoedTheme
+import com.example.jeksoed.utils.bitmapDescriptorFromComposable
 import com.example.jeksoed.utils.bitmapDescriptorFromVector
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.BitmapDescriptor
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
 import com.google.android.libraries.places.api.Places
 import com.google.maps.android.compose.*
 import kotlinx.coroutines.launch
-import com.example.jeksoed.utils.bitmapDescriptorFromComposable
-import com.google.android.gms.maps.model.BitmapDescriptor
-import com.example.jeksoed.ui.screens.passenger.OrderStage
-import com.example.jeksoed.ui.screens.passenger.OrderUiState
-import com.example.jeksoed.ui.screens.passenger.OrderViewModel
-import com.example.jeksoed.ui.screens.passenger.components.OrderSheetContent
 
-// Bagian TopRouteInfoBar dan RouteInfoRow tidak diubah, tetap sama.
 @Composable
 private fun TopRouteInfoBar(pickup: String, destination: String) {
     Card(
@@ -90,30 +89,25 @@ private fun RouteInfoRow(icon: Int, text: String) {
 @Composable
 fun OrderScreen(
     navController: NavController,
-    orderViewModel: OrderViewModel = viewModel() // Cukup satu instance ViewModel
+    orderViewModel: OrderViewModel = viewModel()
 ) {
     val uiState by orderViewModel.uiState.collectAsState()
-    val userLocation by orderViewModel.userLocation.collectAsState() // Ambil lokasi dari ViewModel
+    val userLocation by orderViewModel.userLocation.collectAsState()
     val cameraPositionState = rememberCameraPositionState()
     val bottomSheetState = rememberBottomSheetScaffoldState()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val fusedLocationProviderClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
-    // State untuk izin lokasi
     var hasLocationPermission by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED)
     }
 
-    // Launcher untuk meminta izin
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
         onResult = { isGranted -> hasLocationPermission = isGranted }
     )
 
-    // --- MENGELOLA LOGIKA LOKASI DAN KAMERA ---
-
-    // 1. Minta izin jika belum ada, lalu dapatkan lokasi awal
     LaunchedEffect(hasLocationPermission) {
         if (hasLocationPermission) {
             orderViewModel.getCurrentLocation(fusedLocationProviderClient)
@@ -122,17 +116,17 @@ fun OrderScreen(
         }
     }
 
-    // 2. Animasikan kamera ke lokasi pengguna saat pertama kali didapatkan
     LaunchedEffect(userLocation) {
         userLocation?.let {
-            cameraPositionState.animate(
-                update = CameraUpdateFactory.newLatLngZoom(it, 15f),
-                durationMs = 1000
-            )
+            if (cameraPositionState.position.target.latitude == 0.0 && cameraPositionState.position.target.longitude == 0.0) {
+                cameraPositionState.animate(
+                    update = CameraUpdateFactory.newLatLngZoom(it, 15f),
+                    durationMs = 1000
+                )
+            }
         }
     }
 
-    // 3. Animasikan kamera untuk menunjukkan rute saat sudah ada
     LaunchedEffect(uiState.routeInfo) {
         uiState.routeInfo?.let {
             val pickup = uiState.pickupLocation
@@ -144,17 +138,15 @@ fun OrderScreen(
         }
     }
 
-    // Navigasi ke TripScreen jika ada perjalanan aktif
-    LaunchedEffect(Unit) {
-        orderViewModel.listenToActiveRide { rideId ->
-            navController.navigate("trip/$rideId") {
-                popUpTo("order") { inclusive = true }
+    LaunchedEffect(uiState.stage, uiState.activeRideRequestId) {
+        if (uiState.stage == OrderStage.FINDING_DRIVER && uiState.activeRideRequestId != null) {
+            orderViewModel.listenToActiveRide(uiState.activeRideRequestId!!) { rideId ->
+                navController.navigate(Screen.Trip.createRoute(rideId)) {
+                    popUpTo(Screen.CreateOrder.route) { inclusive = true }
+                }
             }
         }
     }
-
-    // Aksi untuk membuka bottom sheet
-    val expandSheet: () -> Unit = { scope.launch { bottomSheetState.bottomSheetState.expand() } }
 
     val placesClient = remember { Places.createClient(context) }
     val apiKey = remember {
@@ -165,10 +157,11 @@ fun OrderScreen(
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
 
-    // Menampilkan UI menggunakan Dumb Composable
+    val expandSheet: () -> Unit = { scope.launch { bottomSheetState.bottomSheetState.expand() } }
+
     OrderScreenLayout(
         uiState = uiState,
-        userLocation = userLocation, // Kirim lokasi user ke layout
+        userLocation = userLocation,
         cameraPositionState = cameraPositionState,
         bottomSheetState = bottomSheetState,
         sheetPeekHeight = when (uiState.stage) {
@@ -190,7 +183,10 @@ fun OrderScreen(
                 viewModel = orderViewModel,
                 placesClient = placesClient,
                 apiKey = apiKey,
-                onTextFieldFocus = expandSheet
+                onTextFieldFocus = expandSheet,
+                onCreateOrderClick = {
+                    orderViewModel.createOrder()
+                }
             )
         }
     )
@@ -200,7 +196,7 @@ fun OrderScreen(
 @Composable
 private fun OrderScreenLayout(
     uiState: OrderUiState,
-    userLocation: LatLng?, // Terima lokasi user
+    userLocation: LatLng?,
     cameraPositionState: CameraPositionState,
     bottomSheetState: BottomSheetScaffoldState,
     sheetPeekHeight: Dp,
@@ -210,9 +206,11 @@ private fun OrderScreenLayout(
     val context = LocalContext.current
     var pickupMarker by remember { mutableStateOf<BitmapDescriptor?>(null) }
 
-    LaunchedEffect(Unit) {
+    // Efek ini akan dijalankan ulang setiap kali URL foto profil pengguna berubah.
+    // Ini memastikan marker diperbarui jika pengguna mengganti foto profilnya.
+    LaunchedEffect(uiState.userPhotoUrl) {
         pickupMarker = bitmapDescriptorFromComposable(context) {
-            PickupMarkerComposable()
+            PickupMarkerComposable(photoUrl = uiState.userPhotoUrl)
         }
     }
 
@@ -231,47 +229,33 @@ private fun OrderScreenLayout(
                 cameraPositionState = cameraPositionState,
                 uiSettings = MapUiSettings(zoomControlsEnabled = false)
             ) {
-                // PERBAIKAN: Tampilkan marker lokasi user saat pencarian
-                if (uiState.stage == OrderStage.SEARCHING) {
-                    userLocation?.let {
-                        Marker(
-                            state = MarkerState(position = it),
-                            title = "Lokasi Anda"
-                            // Anda bisa menambahkan ikon kustom di sini jika mau
-                        )
-                    }
-                }
+                // --- AWAL PERBAIKAN LOGIKA MARKER ---
 
-                // Marker untuk lokasi jemput (setelah dipilih)
-                if (pickupMarker != null) {
-                    uiState.pickupLocation?.let {
-                        Marker(
-                            state = MarkerState(position = it),
-                            title = "Lokasi Jemput",
-                            icon = pickupMarker
-                        )
-                    }
-                }
-
-                // Marker tujuan
-                uiState.destinationLocation?.let {
+                // Tampilkan marker kustom untuk lokasi JEMPUT jika lokasinya sudah ada.
+                // Parameter 'icon' akan menangani pembaruan dari null (default) ke ikon kustom
+                // setelah 'pickupMarker' selesai dibuat.
+                uiState.pickupLocation?.let { location ->
                     Marker(
-                        state = MarkerState(position = it),
+                        state = MarkerState(position = location),
+                        title = "Lokasi Jemput",
+                        icon = pickupMarker
+                    )
+                }
+
+                // Tampilkan marker default untuk lokasi TUJUAN jika sudah ada.
+                uiState.destinationLocation?.let { location ->
+                    Marker(
+                        state = MarkerState(position = location),
                         title = "Lokasi Tujuan"
                     )
                 }
 
-                // Marker driver di sekitar
+                // --- AKHIR PERBAIKAN LOGIKA MARKER ---
+
                 uiState.driverLocations.forEach { driverLatLng ->
-                    Marker(
-                        state = MarkerState(position = driverLatLng),
-                        title = "Driver",
-                        icon = bitmapDescriptorFromVector(context, R.drawable.motor_icon)
-                    )
+                    Marker(state = MarkerState(position = driverLatLng), title = "Driver", icon = bitmapDescriptorFromVector(context, R.drawable.motor_icon))
                 }
 
-                // PERBAIKAN: Polyline akan otomatis tampil saat routeInfo ada
-                // Ini berlaku untuk stage PICKUP_CONFIRM dan ROUTE_CONFIRM
                 uiState.routeInfo?.let {
                     Polyline(points = it.polylinePoints, color = MaterialTheme.colorScheme.primary, width = 15f)
                 }
@@ -311,9 +295,8 @@ private fun OrderScreenLayout(
     }
 }
 
-// Composable PickupMarkerComposable dan Preview tidak diubah, tetap sama.
 @Composable
-fun PickupMarkerComposable() {
+fun PickupMarkerComposable(photoUrl: String?) {
     Box(
         modifier = Modifier.wrapContentSize(),
         contentAlignment = Alignment.TopCenter
@@ -328,9 +311,12 @@ fun PickupMarkerComposable() {
                 .clip(CircleShape)
                 .background(Color(0xFF3386FF))
         )
-        Image(
-            painter = painterResource(id = R.drawable.person_icon),
+        AsyncImage(
+            model = photoUrl,
             contentDescription = "Profil",
+            placeholder = painterResource(id = R.drawable.person_icon),
+            error = painterResource(id = R.drawable.person_icon),
+            contentScale = ContentScale.Crop,
             modifier = Modifier
                 .size(50.dp)
                 .clip(CircleShape)
@@ -353,25 +339,32 @@ fun PickupMarkerComposable() {
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Preview(showBackground = true, showSystemUi = true)
+@Preview(showSystemUi = true, showBackground = true)
 @Composable
-fun OrderScreenPreview() {
+private fun OrderScreenPreview() {
     JekSoedTheme {
         val dummyUiState = OrderUiState(stage = OrderStage.SEARCHING)
-        val cameraPositionState = rememberCameraPositionState()
+        val cameraPositionState = rememberCameraPositionState {
+            position = CameraPosition.fromLatLngZoom(LatLng(-7.432, 109.244), 15f)
+        }
         val bottomSheetState = rememberBottomSheetScaffoldState()
 
         OrderScreenLayout(
             uiState = dummyUiState,
-            userLocation = LatLng(0.0, 0.0), // Beri lokasi dummy untuk preview
+            userLocation = LatLng(-7.432, 109.244),
             cameraPositionState = cameraPositionState,
             bottomSheetState = bottomSheetState,
             sheetPeekHeight = 400.dp,
             onBackClick = {},
             sheetContent = {
-                Box(modifier = Modifier.fillMaxWidth().height(400.dp), contentAlignment = Alignment.Center) {
-                    Text("Bottom Sheet Content Preview")
-                }
+                SearchStage(
+                    uiState = dummyUiState,
+                    viewModel = null,
+                    placesClient = null,
+                    onTextFieldFocus = {},
+                    context = LocalContext.current,
+                    apiKey = ""
+                )
             }
         )
     }
