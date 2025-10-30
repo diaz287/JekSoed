@@ -20,5 +20,5 @@ data class RideRequest(
     val price: String? = null,
     val destinationAddress: String? = null,
     val pickupAddress: String? = null,
-    val rating: Int = 0
+    val rating: Int? = null
 )

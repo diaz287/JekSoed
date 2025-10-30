@@ -156,7 +156,7 @@ class OrderViewModel : ViewModel() {
                 }
 
                 if (_uiState.value.pickupLocation != null && _uiState.value.destinationLocation != null) {
-                    findRoute(context, apiKey)
+                    _uiState.update { it.copy(stage = OrderStage.PICKUP_CONFIRM) }
                 }
 
             } catch (e: Exception) {
