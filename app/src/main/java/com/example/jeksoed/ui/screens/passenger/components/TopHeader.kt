@@ -29,7 +29,7 @@ fun TopHeader(name: String, hasNotification: Boolean, onNotificationClick: () ->
     ) {
         Text(
             text = "Halo, $name!",
-            style = MaterialTheme.typography.titleLarge,
+            style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             modifier = Modifier
                 .weight(1f)
@@ -37,31 +37,5 @@ fun TopHeader(name: String, hasNotification: Boolean, onNotificationClick: () ->
                 .background(Color.Transparent)
                 .padding(horizontal = 12.dp, vertical = 8.dp)
         )
-        Spacer(modifier = Modifier.width(16.dp))
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(Color.Transparent)
-                .clickable { onNotificationClick() },
-            contentAlignment = Alignment.Center
-        ) {
-            Box {
-                Icon(
-                    imageVector = if (hasNotification) Icons.Filled.Notifications else Icons.Outlined.Notifications,
-                    contentDescription = "Notifikasi",
-                    modifier = Modifier.size(24.dp)
-                )
-                if (hasNotification) {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(colorResource(R.color.unsoed))
-                            .align(Alignment.TopEnd)
-                    )
-                }
-            }
-        }
     }
 }

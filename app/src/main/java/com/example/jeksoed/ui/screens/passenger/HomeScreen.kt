@@ -23,6 +23,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.example.jeksoed.R
+import com.example.jeksoed.data.model.RideRequest // Pastikan import RideRequest ada
 import com.example.jeksoed.navigation.Screen
 import com.example.jeksoed.ui.screens.passenger.components.CategoryGrid
 import com.example.jeksoed.ui.screens.passenger.components.RecentHistoryList
@@ -32,7 +33,6 @@ import com.example.jeksoed.ui.theme.JekSoedTheme
 
 // Data class bisa tetap ada
 data class Category(val name: String, val iconResId: Int, val tag: String? = null)
-// HistoryItem tidak lagi diperlukan karena kita akan menggunakan RideRequest
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,12 +45,41 @@ fun HomeScreen(
     var showDialog by remember { mutableStateOf(false) }
     val hasNotification by remember { mutableStateOf(true) }
 
+    // Navigasi ke trip aktif
     LaunchedEffect(Unit) {
         viewModel.navigateToActiveTrip.collect { rideId ->
             navController.navigate(Screen.Trip.createRoute(rideId))
         }
     }
 
+    // UI-nya didelegasikan ke Composable "Dumb" di bawah
+    HomeScreenContent(
+        uiState = uiState,
+        hasNotification = hasNotification,
+        showDialog = showDialog,
+        onSearchClick = onSearchClick,
+        onNotificationClick = { /* TODO: Logika klik notifikasi */ },
+        onCategoryClick = { categoryName ->
+            when (categoryName) {
+                "JekMotor" -> navController.navigate(Screen.CreateOrder.route)
+                "JekClean", "Lainnya", "JekMobil" -> showDialog = true
+            }
+        },
+        onDismissDialog = { showDialog = false }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HomeScreenContent(
+    uiState: HomeUiState,
+    hasNotification: Boolean,
+    showDialog: Boolean,
+    onSearchClick: () -> Unit,
+    onNotificationClick: () -> Unit,
+    onCategoryClick: (String) -> Unit,
+    onDismissDialog: () -> Unit
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -58,15 +87,14 @@ fun HomeScreen(
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(20.dp) // Tarik item berikutnya ke atas
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // Item 1: Header dan Banner digabung
             item {
                 Column {
                     TopHeader(
                         name = uiState.userName,
                         hasNotification = hasNotification,
-                        onNotificationClick = { /* TODO: Logika klik notifikasi */ }
+                        onNotificationClick = onNotificationClick
                     )
                     Image(
                         painter = painterResource(id = R.drawable.home_bg),
@@ -74,7 +102,7 @@ fun HomeScreen(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(200.dp) // Tinggi banner dikurangi tinggi overlap
+                            .height(200.dp)
                     )
                 }
             }
@@ -82,13 +110,12 @@ fun HomeScreen(
             // Item 2: Card yang berisi SearchBar dan semua konten lainnya
             item {
                 Card(
-                    modifier = Modifier.fillParentMaxSize(),
                     shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Column {
-                        // SearchBar sekarang ada di dalam Card
+                        // SearchBar
                         SearchBarFake(
                             onSearchClick,
                             modifier = Modifier
@@ -100,12 +127,7 @@ fun HomeScreen(
                         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                             Text("Kategori", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.height(40.dp))
-                            CategoryGrid(onCategoryClick = { categoryName ->
-                                when (categoryName) {
-                                    "JekMotor" -> navController.navigate(Screen.CreateOrder.route)
-                                    "JekClean", "Lainnya", "JekMobil" -> showDialog = true
-                                }
-                            })
+                            CategoryGrid(onCategoryClick = onCategoryClick)
                             Spacer(modifier = Modifier.height(24.dp))
                         }
 
@@ -113,7 +135,6 @@ fun HomeScreen(
                         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                             Text("Baru baru ini...", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.height(12.dp))
-                            // --- PERUBAHAN 4: Tampilkan loading dan riwayat dinamis ---
                             if (uiState.isLoading) {
                                 CircularProgressIndicator(modifier = Modifier.size(24.dp))
                             } else {
@@ -136,12 +157,12 @@ fun HomeScreen(
     }
 
     if (showDialog) {
-        DevelopmentDialog(onDismiss = { showDialog = false })
+        DevelopmentDialog(onDismiss = onDismissDialog)
     }
 }
 
 
-// SearchBarFake diubah sedikit untuk menerima Modifier
+// SearchBarFake tidak berubah
 @Composable
 fun SearchBarFake(onSearchClick: () -> Unit, modifier: Modifier = Modifier) {
     Card(
@@ -153,7 +174,7 @@ fun SearchBarFake(onSearchClick: () -> Unit, modifier: Modifier = Modifier) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(54.dp) // Beri tinggi eksplisit
+                .height(54.dp)
                 .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
@@ -187,14 +208,40 @@ fun DevelopmentDialog(onDismiss: () -> Unit) {
     )
 }
 
-// Preview diperbarui
+// --- INI PERUBAHAN UTAMA UNTUK PREVIEW ---
+// Preview diperbarui untuk mencocokkan model RideRequest
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 fun HomeScreenPreview() {
+    // Import Timestamp jika diperlukan
+    // import com.google.firebase.Timestamp
+
     JekSoedTheme {
-        HomeScreen(
+        HomeScreenContent(
+            // Kita berikan data palsu (fake data) yang valid
+            uiState = HomeUiState(
+                userName = "Sobat Jeksoed",
+                recentTrips = listOf(
+                    // Gunakan field yang benar: pickupName, destinationName, createdAt
+                    RideRequest(
+                        pickupName = "Fakultas Teknik",
+                        destinationName = "Audit FP",
+                        createdAt = com.google.firebase.Timestamp.now()
+                    ),
+                    RideRequest(
+                        pickupName = "Rektorat",
+                        destinationName = "FISIP",
+                        createdAt = com.google.firebase.Timestamp.now()
+                    )
+                ),
+                isLoading = false
+            ),
+            hasNotification = true,
+            showDialog = false,
             onSearchClick = {},
-            navController = rememberNavController()
+            onNotificationClick = {},
+            onCategoryClick = {},
+            onDismissDialog = {}
         )
     }
 }
