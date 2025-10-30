@@ -106,7 +106,7 @@ fun ChatTopBar(name: String, photoUrl: String?, onBackClick: () -> Unit) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 12.dp),
+                .padding(horizontal = 8.dp).systemBarsPadding(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBackClick) {
@@ -220,13 +220,9 @@ fun MessageInput(
             modifier = Modifier.fillMaxWidth().padding(8.dp),
             placeholder = { Text("Ketik pesan kamu") },
             shape = RoundedCornerShape(50),
-            leadingIcon = {
-                Icon(Icons.Outlined.Mood, contentDescription = "Emoji")
-            },
             trailingIcon = {
                 if (value.isBlank()) {
                     Row {
-                        Icon(Icons.Outlined.Mic, contentDescription = "Voice Message", modifier = Modifier.padding(vertical = 12.dp))
                         IconButton(onClick = onAttachClick, enabled = !isUploading) {
                             if (isUploading) {
                                 CircularProgressIndicator(modifier = Modifier.size(24.dp))
