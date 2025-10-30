@@ -92,10 +92,11 @@ class TripViewModel(
 
                     if (request?.status == "completed" && !isDriver) {
                         val driverId = request.driverId
+                        val rideId = request.id
                         if (driverId != null) {
                             viewModelScope.launch {
                                 // Kirim event yang benar untuk navigasi ke halaman rating
-                                _navEvent.emit(TripNavEvent.NavigateToRatingScreen(driverId, rideRequestId))
+                                _navEvent.emit(TripNavEvent.NavigateToRatingScreen(driverId, rideId))
                             }
                         }
                     }

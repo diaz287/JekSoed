@@ -202,7 +202,7 @@ fun DetailSheet(
 
         // --- PERBAIKAN: Tampilkan rating secara dinamis ---
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-            val rating = ride.rating
+            val rating = ride.rating ?: 0
             Text(
                 text = if (isDriverView) "Rating dari penumpang" else "Rating dari kamu",
                 style = MaterialTheme.typography.titleMedium,

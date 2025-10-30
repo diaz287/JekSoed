@@ -8,6 +8,7 @@ import com.example.jeksoed.data.model.User
 import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.ktx.toObject
 import com.google.maps.android.PolyUtil
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,6 +34,7 @@ class ActivityDetailViewModel(
     private val rideRequestId: String = savedStateHandle.get<String>("rideRequestId")!!
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
+    private var rideListener: ListenerRegistration? = null
 
     private val _uiState = MutableStateFlow(ActivityDetailUiState())
     val uiState = _uiState.asStateFlow()
@@ -42,47 +44,65 @@ class ActivityDetailViewModel(
     }
 
     private fun fetchRideDetails() {
-        viewModelScope.launch {
-            try {
-                val rideDoc = db.collection("ride_requests").document(rideRequestId).get().await()
-                val ride = rideDoc.toObject<RideRequest>()?.copy(id = rideDoc.id)
-                if (ride != null) {
-                    val currentUserId = auth.currentUser?.uid
-                    val isDriver = ride.driverId == currentUserId
-                    val otherUserId = if (isDriver) ride.passengerId else ride.driverId
-
-                    var otherUser: User? = null
-                    if (!otherUserId.isNullOrBlank()) {
-                        val otherUserDoc = db.collection("users").document(otherUserId).get().await()
-                        otherUser = otherUserDoc.toObject<User>()
-                    }
-
-                    val completedAt = ride.createdAt?.toDate()?.time ?: 0L
-                    val thirtyMinutesInMillis = 30 * 60 * 1000
-                    val isChatEnabled = (System.currentTimeMillis() - completedAt) < thirtyMinutesInMillis
-
-                    // --- DECODE POLYLINE DI SINI ---
-                    val polylinePoints = if (!ride.encodedPolyline.isNullOrBlank()) {
-                        PolyUtil.decode(ride.encodedPolyline)
-                    } else {
-                        emptyList()
-                    }
-
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            rideRequest = ride,
-                            otherUser = otherUser,
-                            isChatEnabled = isChatEnabled,
-                            isDriver = isDriver,
-                            polylinePoints = polylinePoints // Simpan poin rute ke state
-                        )
-                    }
+        rideListener?.remove()
+        rideListener = db.collection("ride_requests").document(rideRequestId)
+            .addSnapshotListener { rideDoc, error ->
+                if (error != null) {
+                    _uiState.update { it.copy(isLoading = false) }
+                    return@addSnapshotListener
                 }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(isLoading = false) }
+
+                if (rideDoc != null && rideDoc.exists()) {
+                    val ride = rideDoc.toObject<RideRequest>()?.copy(id = rideDoc.id)
+
+                    // Pindahkan semua logika fetching user ke dalam listener
+                    // agar dieksekusi setiap kali data ride berubah
+                    viewModelScope.launch {
+                        if (ride != null) {
+                            val currentUserId = auth.currentUser?.uid
+                            val isDriver = ride.driverId == currentUserId
+                            val otherUserId = if (isDriver) ride.passengerId else ride.driverId
+
+                            var otherUser: User? = null
+                            if (!otherUserId.isNullOrBlank()) {
+                                val otherUserDoc = db.collection("users").document(otherUserId).get().await()
+                                otherUser = otherUserDoc.toObject<User>()
+                            }
+
+                            val completedAt = ride.createdAt?.toDate()?.time ?: 0L
+                            val thirtyMinutesInMillis = 30 * 60 * 1000
+                            val isChatEnabled = (System.currentTimeMillis() - completedAt) < thirtyMinutesInMillis
+
+                            val polylinePoints = if (!ride.encodedPolyline.isNullOrBlank()) {
+                                PolyUtil.decode(ride.encodedPolyline)
+                            } else {
+                                emptyList()
+                            }
+
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    rideRequest = ride,
+                                    otherUser = otherUser,
+                                    isChatEnabled = isChatEnabled,
+                                    isDriver = isDriver,
+                                    polylinePoints = polylinePoints
+                                )
+                            }
+                        } else {
+                            _uiState.update { it.copy(isLoading = false) }
+                        }
+                    }
+                } else {
+                    _uiState.update { it.copy(isLoading = false) }
+                }
             }
-        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        // Hentikan listener saat ViewModel dihancurkan
+        rideListener?.remove()
     }
 
     fun getFormattedRating(user: User?): String {
