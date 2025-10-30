@@ -8,8 +8,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Person
@@ -88,18 +90,34 @@ fun ProfileScreenUI(
     onLogoutClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
-    val profileImageSize = 90.dp
+    val profileImageSize = 150.dp
     val yellowColor = Color(0xFFFFD803)
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF5F5F5))
+            .background(Color(0xFFF5F5F5)) // Background utama abu-abu muda
     ) {
+        // --- PERMINTAAN 1: Judul "Profile" di area putih terpisah ---
+        Surface( // Surface memberi background putih dan elevasi (shadow)
+            modifier = Modifier.fillMaxWidth().statusBarsPadding(),
+            color = Color.White,
+            shadowElevation = 4.dp // Shadow tipis di bawah
+        ) {
+            Text(
+                "Profile",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(16.dp), // Padding standar
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Left
+            )
+        }
+
+        // --- PERMINTAAN 2: Canvas kuning diperpanjang ---
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(180.dp), // Tinggi header kuning
+                .height(210.dp), // <-- SEBELUMNYA 180.dp
             contentAlignment = Alignment.TopStart
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
@@ -109,7 +127,7 @@ fun ProfileScreenUI(
                     lineTo(size.width, size.height * 0.75f)
                     quadraticBezierTo(
                         x1 = size.width / 2,
-                        y1 = size.height * 1.1f, // Lengkungan lebih panjang ke bawah
+                        y1 = size.height * 1.1f, // Lengkungan tetap
                         x2 = 0f,
                         y2 = size.height * 0.75f
                     )
@@ -117,23 +135,22 @@ fun ProfileScreenUI(
                 }
                 drawPath(path, color = yellowColor)
             }
-            Text("Profile", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(16.dp).offset(y = 16.dp), fontWeight = FontWeight.Bold, textAlign = TextAlign.Left)
         }
 
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp),
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .offset(y = -(profileImageSize + 16.dp)),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // --- Box untuk Kartu Akun & Foto ---
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .offset(y = -(profileImageSize + 16.dp)), // Geser ke atas
+                    .fillMaxWidth(),
                 contentAlignment = Alignment.TopCenter
             ) {
 
-                // --- PERUBAHAN 1: CARD DITARUH SEBELUM FOTO ---
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -159,20 +176,18 @@ fun ProfileScreenUI(
                     }
                 }
 
-                // --- PERUBAHAN 2: FOTO DITARUH SETELAH CARD AGAR MENUMPUK DI ATAS ---
                 AsyncImage(
                     model = uiState.photoUrl.ifBlank { R.drawable.person_icon },
                     contentDescription = "Foto Profil",
                     modifier = Modifier
                         .size(profileImageSize)
                         .clip(CircleShape)
-                        .border(4.dp, yellowColor, CircleShape),
+                        .border(8.dp, yellowColor, CircleShape),
                     contentScale = ContentScale.Crop
                 )
             }
 
-            // Mengatur ulang spacer agar jarak antar card pas
-            Spacer(modifier = Modifier.height(24.dp - (profileImageSize + 16.dp)))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Info Card
             Card(
@@ -187,8 +202,7 @@ fun ProfileScreenUI(
                     Text("Ketentuan Syarat dan Privasi", modifier = Modifier.clickable(onClick = onTncClick).padding(vertical = 12.dp))
                 }
             }
-
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(16.dp)) // <-- Ganti dengan tinggi tetap
 
             // Tombol Aksi
             OutlinedButton(
@@ -213,7 +227,7 @@ fun ProfileScreenUI(
     }
 }
 
-// ... (Sisa kode tidak perlu diubah)
+
 @Composable
 fun ProfileMenuItem(icon: ImageVector, text: String, onClick: () -> Unit) {
     Row(
