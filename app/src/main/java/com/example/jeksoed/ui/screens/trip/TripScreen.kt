@@ -2,6 +2,7 @@
 
 package com.example.jeksoed.ui.screens.trip
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -118,17 +119,68 @@ fun TripScreenLayout(
     val context = LocalContext.current // Dapatkan context untuk marker
 
     // Efek untuk menyesuaikan kamera
-    LaunchedEffect(uiState.dynamicPolylinePoints) { // PERUBAHAN: Bereaksi terhadap polyline dinamis
-        if (uiState.dynamicPolylinePoints.isNotEmpty()) {
-            val boundsBuilder = LatLngBounds.builder()
-            uiState.dynamicPolylinePoints.forEach { boundsBuilder.include(it) }
-            // Juga masukkan lokasi tujuan agar selalu terlihat
-            uiState.rideRequest?.destinationLocation?.let {
-                boundsBuilder.include(LatLng(it["latitude"] ?: 0.0, it["longitude"] ?: 0.0))
+    LaunchedEffect(
+        uiState.isDriver,
+        uiState.rideRequest?.status,
+        uiState.rideRequest?.driverCurrentLocation,
+        uiState.dynamicPolylinePoints // Juga amati polyline untuk kasus "full route"
+    ) {
+        val request = uiState.rideRequest
+        if (request == null || request.status == "completed") return@LaunchedEffect // Jangan lakukan apa-apa jika request null atau sudah selesai
+
+        // 1. Dapatkan semua LatLng yang relevan
+        val driverLoc = request.driverCurrentLocation?.let { LatLng(it["latitude"] ?: 0.0, it["longitude"] ?: 0.0) }
+        val pickupLoc = LatLng(request.pickupLocation["latitude"] ?: 0.0, request.pickupLocation["longitude"] ?: 0.0)
+        val destLoc = LatLng(request.destinationLocation["latitude"] ?: 0.0, request.destinationLocation["longitude"] ?: 0.0)
+
+        val boundsBuilder = LatLngBounds.builder()
+
+        // 2. Terapkan logika zoom berdasarkan peran dan status
+        if (uiState.isDriver) {
+            // --- LOGIKA UNTUK DRIVER ---
+            when (request.status) {
+                "accepted" -> {
+                    // Zoom: Driver + Lokasi Jemput
+                    if (driverLoc != null) boundsBuilder.include(driverLoc)
+                    boundsBuilder.include(pickupLoc)
+                }
+                "arrived", "started" -> {
+                    // Zoom: Seluruh Rute (Jemput ke Tujuan)
+                    // Cara terbaik adalah menggunakan polyline jika ada
+                    if (uiState.dynamicPolylinePoints.isNotEmpty()) {
+                        uiState.dynamicPolylinePoints.forEach { boundsBuilder.include(it) }
+                    } else {
+                        // Fallback jika polyline belum dimuat
+                        boundsBuilder.include(pickupLoc)
+                        boundsBuilder.include(destLoc)
+                        if (driverLoc != null) boundsBuilder.include(driverLoc)
+                    }
+                }
             }
-            cameraPositionState.animate(
-                CameraUpdateFactory.newLatLngBounds(boundsBuilder.build(), 150)
-            )
+        } else {
+            // --- LOGIKA UNTUK PENUMPANG ---
+            when (request.status) {
+                "accepted", "arrived" -> {
+                    // Zoom: Driver + Lokasi Jemput
+                    if (driverLoc != null) boundsBuilder.include(driverLoc)
+                    boundsBuilder.include(pickupLoc)
+                }
+                "started" -> {
+                    // Zoom: Driver + Lokasi Tujuan
+                    if (driverLoc != null) boundsBuilder.include(driverLoc)
+                    boundsBuilder.include(destLoc)
+                }
+            }
+        }
+
+        // 3. Jalankan animasi kamera
+        try {
+            val bounds = boundsBuilder.build()
+            // Padding 150px agar marker tidak terpotong
+            cameraPositionState.animate(CameraUpdateFactory.newLatLngBounds(bounds, 150))
+        } catch (e: IllegalStateException) {
+            // Ini terjadi jika boundsBuilder kosong (misal driverLoc masih null)
+            Log.w("TripScreen", "Gagal membuat bounds kamera, lokasi belum siap.")
         }
     }
 
@@ -137,7 +189,7 @@ fun TripScreenLayout(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState
         ) {
-            // PERBAIKAN: Gunakan dynamicPolylinePoints untuk menggambar rute
+            // Gunakan dynamicPolylinePoints untuk menggambar rute
             if (uiState.dynamicPolylinePoints.isNotEmpty()) {
                 Polyline(points = uiState.dynamicPolylinePoints, color = MaterialTheme.colorScheme.primary, width = 15f)
             }

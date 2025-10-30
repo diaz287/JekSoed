@@ -213,6 +213,17 @@ private fun OrderScreenLayout(
             PickupMarkerComposable(photoUrl = uiState.userPhotoUrl)
         }
     }
+    LaunchedEffect(uiState.pickupLocation) {
+        uiState.pickupLocation?.let { pickup ->
+            // Hanya animasikan kamera jika kita BELUM menghitung rute.
+            if (uiState.routeInfo == null) {
+                cameraPositionState.animate(
+                    update = CameraUpdateFactory.newLatLngZoom(pickup, 15f),
+                    durationMs = 1000
+                )
+            }
+        }
+    }
 
     BottomSheetScaffold(
         scaffoldState = bottomSheetState,
