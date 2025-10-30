@@ -1,0 +1,294 @@
+// main/java/com/example/jeksoed/ui/screens/trip/TripScreen.kt
+
+package com.example.jeksoed.ui.screens.trip
+
+import android.util.Log
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
+import com.example.jeksoed.data.model.RideRequest
+import com.example.jeksoed.navigation.Screen
+import com.example.jeksoed.ui.screens.trip.components.TripDriverBottomSheet
+import com.example.jeksoed.ui.theme.JekSoedTheme
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
+import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
+import com.google.maps.android.PolyUtil
+import com.google.maps.android.compose.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import com.example.jeksoed.ui.screens.trip.components.PaymentConfirmationCard
+import com.example.jeksoed.ui.screens.trip.components.TripDriverBottomSheet
+import com.example.jeksoed.ui.screens.trip.components.TripPassengerSheet
+import com.example.jeksoed.utils.bitmapDescriptorFromVector
+import com.example.jeksoed.utils.formatCurrency
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.example.jeksoed.R
+
+// Composable "Pintar" yang terhubung ke ViewModel
+@Composable
+fun TripScreen(
+    navController: NavController,
+    rideRequestId: String
+) {
+    val viewModel: TripViewModel = viewModel(
+        factory = TripViewModelFactory(rideRequestId)
+    )
+
+    val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+
+    // Logic untuk update lokasi driver (tidak berubah)
+    if (uiState.isDriver) {
+        val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+        DisposableEffect(Unit) {
+            viewModel.startLocationUpdates(fusedLocationClient, context)
+            onDispose {
+                viewModel.stopLocationUpdates(fusedLocationClient)
+            }
+        }
+    }
+
+    // Logic untuk navigasi
+    LaunchedEffect(Unit) {
+        viewModel.navEvent.collect { event ->
+            when (event) {
+                is TripNavEvent.NavigateToHome -> {
+                    // Cek peran pengguna dari uiState, lalu arahkan ke tujuan yang benar
+                    val destination = if (uiState.isDriver) Screen.DriverMain.route else Screen.PassengerMain.route
+                    navController.navigate(destination) {
+                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                    }
+                }
+                is TripNavEvent.NavigateToRatingScreen -> {
+                    navController.navigate(Screen.Rating.createRoute(event.driverId, event.rideRequestId)) {
+                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                    }
+                }
+                is TripNavEvent.NavigateToTripCompleted -> {
+                    navController.navigate(Screen.TripCompleted.createRoute(event.rideRequestId)) {
+                        popUpTo(Screen.Trip.route) { inclusive = true }
+                    }
+                }
+
+            }
+        }
+    }
+
+    // Panggil UI Composable yang baru
+    TripScreenLayout(
+        uiState = uiState,
+        cameraPositionState = rememberCameraPositionState(),
+        onUpdateStatus = viewModel::updateTripStatus,
+        onCancelTrip = viewModel::cancelTrip,
+        onFinishTrip = viewModel::confirmPaymentAndFinishTrip,
+        onChatClick = { rideId ->
+            navController.navigate(Screen.Chat.createRoute(rideId))
+        },
+        onBackClick = { navController.popBackStack() }
+    )
+}
+
+// Composable "Biasa" yang hanya menampilkan UI
+@Composable
+fun TripScreenLayout(
+    uiState: TripUiState,
+    cameraPositionState: CameraPositionState,
+    onUpdateStatus: (String) -> Unit,
+    onCancelTrip: () -> Unit,
+    onFinishTrip: () -> Unit,
+    onChatClick: (rideId: String) -> Unit,
+    onBackClick: () -> Unit
+) {
+    val context = LocalContext.current // Dapatkan context untuk marker
+
+    // Efek untuk menyesuaikan kamera
+    LaunchedEffect(
+        uiState.isDriver,
+        uiState.rideRequest?.status,
+        uiState.rideRequest?.driverCurrentLocation,
+        uiState.dynamicPolylinePoints // Juga amati polyline untuk kasus "full route"
+    ) {
+        val request = uiState.rideRequest
+        if (request == null || request.status == "completed") return@LaunchedEffect // Jangan lakukan apa-apa jika request null atau sudah selesai
+
+        // 1. Dapatkan semua LatLng yang relevan
+        val driverLoc = request.driverCurrentLocation?.let { LatLng(it["latitude"] ?: 0.0, it["longitude"] ?: 0.0) }
+        val pickupLoc = LatLng(request.pickupLocation["latitude"] ?: 0.0, request.pickupLocation["longitude"] ?: 0.0)
+        val destLoc = LatLng(request.destinationLocation["latitude"] ?: 0.0, request.destinationLocation["longitude"] ?: 0.0)
+
+        val boundsBuilder = LatLngBounds.builder()
+
+        // 2. Terapkan logika zoom berdasarkan peran dan status
+        if (uiState.isDriver) {
+            // --- LOGIKA UNTUK DRIVER ---
+            when (request.status) {
+                "accepted" -> {
+                    // Zoom: Driver + Lokasi Jemput
+                    if (driverLoc != null) boundsBuilder.include(driverLoc)
+                    boundsBuilder.include(pickupLoc)
+                }
+                "arrived", "started" -> {
+                    // Zoom: Seluruh Rute (Jemput ke Tujuan)
+                    // Cara terbaik adalah menggunakan polyline jika ada
+                    if (uiState.dynamicPolylinePoints.isNotEmpty()) {
+                        uiState.dynamicPolylinePoints.forEach { boundsBuilder.include(it) }
+                    } else {
+                        // Fallback jika polyline belum dimuat
+                        boundsBuilder.include(pickupLoc)
+                        boundsBuilder.include(destLoc)
+                        if (driverLoc != null) boundsBuilder.include(driverLoc)
+                    }
+                }
+            }
+        } else {
+            // --- LOGIKA UNTUK PENUMPANG ---
+            when (request.status) {
+                "accepted", "arrived" -> {
+                    // Zoom: Driver + Lokasi Jemput
+                    if (driverLoc != null) boundsBuilder.include(driverLoc)
+                    boundsBuilder.include(pickupLoc)
+                }
+                "started" -> {
+                    // Zoom: Driver + Lokasi Tujuan
+                    if (driverLoc != null) boundsBuilder.include(driverLoc)
+                    boundsBuilder.include(destLoc)
+                }
+            }
+        }
+
+        // 3. Jalankan animasi kamera
+        try {
+            val bounds = boundsBuilder.build()
+            // Padding 150px agar marker tidak terpotong
+            cameraPositionState.animate(CameraUpdateFactory.newLatLngBounds(bounds, 150))
+        } catch (e: IllegalStateException) {
+            // Ini terjadi jika boundsBuilder kosong (misal driverLoc masih null)
+            Log.w("TripScreen", "Gagal membuat bounds kamera, lokasi belum siap.")
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        GoogleMap(
+            modifier = Modifier.fillMaxSize(),
+            cameraPositionState = cameraPositionState
+        ) {
+            // Gunakan dynamicPolylinePoints untuk menggambar rute
+            if (uiState.dynamicPolylinePoints.isNotEmpty()) {
+                Polyline(points = uiState.dynamicPolylinePoints, color = MaterialTheme.colorScheme.primary, width = 15f)
+            }
+
+            uiState.rideRequest?.let { request ->
+                // Marker Lokasi Jemput
+                val pickupLatLng = LatLng(request.pickupLocation["latitude"] ?: 0.0, request.pickupLocation["longitude"] ?: 0.0)
+                Marker(state = MarkerState(position = pickupLatLng), title = "Jemput")
+
+                // Marker Lokasi Tujuan (selalu ditampilkan)
+                val destLatLng = LatLng(request.destinationLocation["latitude"] ?: 0.0, request.destinationLocation["longitude"] ?: 0.0)
+                Marker(state = MarkerState(position = destLatLng), title = "Tujuan")
+
+                // Marker Lokasi Driver
+                request.driverCurrentLocation?.let {
+                    val driverLatLng = LatLng(it["latitude"] ?: 0.0, it["longitude"] ?: 0.0)
+                    Marker(
+                        state = MarkerState(position = driverLatLng),
+                        title = "Driver",
+                        // Menggunakan ikon motor dari drawable
+                        icon = bitmapDescriptorFromVector(context, R.drawable.motor_icon)
+                    )
+                }
+            }
+        }
+
+        // --- TOMBOL KEMBALI DI ATAS KIRI ---
+        IconButton(
+            onClick = onBackClick,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(horizontal = 16.dp, vertical = 32.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surface)
+        ) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
+        }
+
+        // --- BOTTOM SHEET DI BAWAH ---
+        Box(modifier = Modifier.align(Alignment.BottomCenter)) {
+            if (uiState.isDriver) {
+                // Tampilan untuk Driver
+                AnimatedVisibility(
+                    visible = uiState.rideRequest?.status != "completed",
+                    exit = slideOutVertically { it }
+                ) {
+                    TripDriverBottomSheet(
+                        uiState = uiState,
+                        onUpdateStatus = onUpdateStatus,
+                        onCancelTrip = onCancelTrip,
+                        onChatClick = { uiState.rideRequest?.id?.let { onChatClick(it) } }
+                    )
+                }
+
+                AnimatedVisibility(
+                    visible = uiState.rideRequest?.status == "completed",
+                    enter = slideInVertically { it }
+                ) {
+                    PaymentConfirmationCard(
+                        totalPayment = uiState.rideRequest?.price ?: "Rp0",
+                        onConfirmClick = onFinishTrip
+                    )
+                }
+            } else {
+                // Tampilan untuk Penumpang
+                TripPassengerSheet(
+                    uiState = uiState,
+                    onCancelTrip = onCancelTrip,
+                    onChatClick = { uiState.rideRequest?.id?.let { onChatClick(it) } }
+                )
+            }
+        }
+    }
+}
+@Preview(showSystemUi = true, name = "Trip Screen - Status Started")
+@Composable
+private fun TripScreenLayoutStartedPreview() {
+    TripScreenLayoutPreview(status = "started")
+}
+
+@Preview(showSystemUi = true, name = "Trip Screen - Status Completed")
+@Composable
+private fun TripScreenLayoutCompletedPreview() {
+    TripScreenLayoutPreview(status = "completed")
+}
+
+@Composable
+private fun TripScreenLayoutPreview(status: String) {
+    val fakeRideRequest = RideRequest(status = status)
+    val fakeUiState = TripUiState(rideRequest = fakeRideRequest, isDriver = true)
+    JekSoedTheme {
+        TripScreenLayout(
+            uiState = fakeUiState,
+            cameraPositionState = rememberCameraPositionState(),
+            onUpdateStatus = {},
+            onCancelTrip = {},
+            onFinishTrip = {},
+            onChatClick = {},
+            onBackClick = {}
+        )
+    }
+}

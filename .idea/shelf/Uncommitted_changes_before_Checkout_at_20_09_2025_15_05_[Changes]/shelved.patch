@@ -1,0 +1,157 @@
+Index: app/src/main/java/com/example/jeksoed/ui/screens/passenger/PassengerHome.kt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.example.jeksoed.ui.screens.passenger\r\n\r\nimport androidx.compose.foundation.Image\r\nimport androidx.compose.foundation.background\r\nimport androidx.compose.foundation.clickable\r\nimport androidx.compose.foundation.layout.*\r\nimport androidx.compose.foundation.lazy.LazyColumn\r\nimport androidx.compose.foundation.lazy.items\r\nimport androidx.compose.foundation.shape.CircleShape\r\nimport androidx.compose.foundation.shape.RoundedCornerShape\r\nimport androidx.compose.material.icons.Icons\r\nimport androidx.compose.material.icons.filled.*\r\nimport androidx.compose.material3.*\r\nimport androidx.compose.runtime.*\r\nimport androidx.compose.ui.Alignment\r\nimport androidx.compose.ui.Modifier\r\nimport androidx.compose.ui.draw.clip\r\nimport androidx.compose.ui.graphics.Color\r\nimport androidx.compose.ui.layout.ContentScale\r\nimport androidx.compose.ui.res.painterResource\r\nimport androidx.compose.ui.text.font.FontWeight\r\nimport androidx.compose.ui.tooling.preview.Preview\r\nimport androidx.compose.ui.unit.dp\r\nimport androidx.compose.ui.unit.sp\r\nimport androidx.navigation.NavController\r\nimport androidx.navigation.compose.currentBackStackEntryAsState\r\nimport com.example.jeksoed.R\r\nimport com.example.jeksoed.ui.components.BottomBar\r\nimport com.example.jeksoed.ui.components.BottomNavItem\r\nimport com.example.jeksoed.ui.theme.JekSoedTheme\r\n\r\n\r\n// Data class sederhana untuk data palsu\r\ndata class LocationData(val title: String, val address: String)\r\n\r\n/**\r\n * =================================================================================\r\n * SMART COMPOSABLE\r\n * - Bertugas menyediakan data (nama user, riwayat lokasi, dll).\r\n * - Menangani semua logika navigasi dan interaksi data.\r\n * =================================================================================\r\n */\r\n@Composable\r\nfun PassengerHomeScreen(\r\n    navController: NavController\r\n) {\r\n    // Data palsu untuk tujuan UI development\r\n    val userName = \"Fawwaz\"\r\n    val recentLocations = listOf(\r\n        LocationData(\"Jl. Wayu No.48\", \"Jl. Wayu No.48, Cigimbal, Tritih Kulon, Kec...\"),\r\n        LocationData(\"Jalan Turi No. 61\", \"Jalan Turi No. 61, Lomanis, Cilacap Tengah,...\"),\r\n        LocationData(\"dr. H. Marwanto\", \"Jl. Gatot Subroto No.198, Klempang, Gunu...\"),\r\n        LocationData(\"jalan mt haryono no 194\", \"Jl. MT. Haryono No.194, Rawakeong, Loma...\")\r\n    )\r\n\r\n    // Ambil state rute saat ini dari NavController\r\n    val navBackStackEntry by navController.currentBackStackEntryAsState()\r\n    val currentRoute = navBackStackEntry?.destination?.route\r\n\r\n    // Definisikan aksi navigasi di sini\r\n    val onBottomNavItemClick = { route: String ->\r\n        navController.navigate(route) {\r\n            navController.graph.startDestinationRoute?.let { popUpTo(it) { saveState = true } }\r\n            launchSingleTop = true\r\n            restoreState = true\r\n        }\r\n    }\r\n\r\n    PassengerHomeScreenUI(\r\n        userName = userName,\r\n        recentLocations = recentLocations,\r\n        currentRoute = currentRoute, // <-- Kirim route aktif sebagai String\r\n        onBottomNavItemClick = onBottomNavItemClick, // <-- Kirim lambda aksi\r\n        onNotificationClick = { /* TODO: Logika klik notifikasi */ },\r\n        onSearchClick = { /* TODO: Logika klik search bar */ }\r\n    )\r\n}\r\n\r\n/**\r\n * =================================================================================\r\n * DUMB UI COMPOSABLE\r\n * - TIDAK tahu tentang NavController.\r\n * - Hanya menerima data (String, List, dll) dan fungsi lambda.\r\n * =================================================================================\r\n */\r\n@OptIn(ExperimentalMaterial3Api::class)\r\n@Composable\r\nfun PassengerHomeScreenUI(\r\n    userName: String,\r\n    recentLocations: List<LocationData>,\r\n    currentRoute: String?,\r\n    onBottomNavItemClick: (String) -> Unit,\r\n    onNotificationClick: () -> Unit,\r\n    onSearchClick: () -> Unit\r\n) {\r\n    Scaffold(\r\n        topBar = {\r\n            TopAppBar(\r\n                title = { /* ... */ },\r\n                actions = {\r\n                    IconButton(onClick = onNotificationClick) {\r\n                        Icon(Icons.Default.Notifications, contentDescription = \"Notifikasi\")\r\n                    }\r\n                },\r\n                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF00880C))\r\n            )\r\n        },\r\n        bottomBar = {\r\n            // UI hanya meneruskan state dan aksi ke komponen BottomBar\r\n            BottomBar(\r\n                currentRoute = currentRoute,\r\n                onItemClick = onBottomNavItemClick\r\n            )\r\n        }\r\n    ) { paddingValues ->\r\n        LazyColumn(\r\n            modifier = Modifier\r\n                .fillMaxSize()\r\n                .padding(paddingValues)\r\n                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))\r\n        ) {\r\n            item { HomeHeader() }\r\n            item {\r\n                Column(Modifier.background(MaterialTheme.colorScheme.surface)) {\r\n                    GreetingSection(name = userName)\r\n                    PromoCard()\r\n                    SearchSection(onSearchClick = onSearchClick)\r\n                }\r\n            }\r\n            item {\r\n                Text(\r\n                    text = \"Tujuan Terakhir\",\r\n                    style = MaterialTheme.typography.titleMedium,\r\n                    fontWeight = FontWeight.Bold,\r\n                    modifier = Modifier.padding(start = 16.dp, top = 24.dp, bottom = 8.dp)\r\n                )\r\n            }\r\n            items(recentLocations) { location ->\r\n                RecentLocationItem(location = location)\r\n            }\r\n        }\r\n    }\r\n}\r\n\r\n/**\r\n * =================================================================================\r\n * KUMPULAN HELPER UI COMPONENTS\r\n * =================================================================================\r\n */\r\n@Composable\r\nprivate fun HomeHeader() {\r\n    Box(\r\n        modifier = Modifier\r\n            .fillMaxWidth()\r\n            .height(100.dp)\r\n            .background(Color(0xFF00880C)), // Warna hijau Gojek\r\n        contentAlignment = Alignment.Center\r\n    ) {\r\n        // Di sini Anda bisa menaruh gambar ilustrasi SVG atau PNG\r\n        Text(\"Ilustrasi Header\", color = Color.White, fontWeight = FontWeight.Bold)\r\n    }\r\n}\r\n\r\n@Composable\r\nprivate fun GreetingSection(name: String) {\r\n    Column(\r\n        modifier = Modifier\r\n            .fillMaxWidth()\r\n            .padding(16.dp)\r\n    ) {\r\n        Text(\r\n            text = \"Siap buat nemenin $name\",\r\n            style = MaterialTheme.typography.headlineSmall,\r\n            fontWeight = FontWeight.Bold\r\n        )\r\n        Text(\r\n            text = \"Walau udah malam, tetep berangkat!\",\r\n            style = MaterialTheme.typography.bodyLarge,\r\n            color = Color.Gray\r\n        )\r\n    }\r\n}\r\n\r\n@Composable\r\nprivate fun PromoCard() {\r\n    Card(\r\n        modifier = Modifier\r\n            .fillMaxWidth()\r\n            .padding(horizontal = 16.dp),\r\n        shape = RoundedCornerShape(16.dp),\r\n        colors = CardDefaults.cardColors(containerColor = Color(0xFFEFFFF0)),\r\n        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)\r\n    ) {\r\n        Row(\r\n            modifier = Modifier.padding(16.dp),\r\n            verticalAlignment = Alignment.CenterVertically\r\n        ) {\r\n            Icon(\r\n                painter = painterResource(id = R.drawable.ic_launcher_foreground), // Ganti dengan ikon yang sesuai\r\n                contentDescription = \"Promo\",\r\n                tint = Color(0xFF00880C),\r\n                modifier = Modifier.size(40.dp)\r\n            )\r\n            Spacer(modifier = Modifier.width(12.dp))\r\n            Column {\r\n                Text(\"Maw HEMAT setiap hari?\", fontWeight = FontWeight.Bold)\r\n                Text(\"Let's GoRide Hemat! Ke mana aja selalu diskon~\", fontSize = 14.sp)\r\n            }\r\n            Spacer(modifier = Modifier.weight(1f))\r\n            Icon(Icons.Default.ArrowForwardIos, contentDescription = null, modifier = Modifier.size(16.dp))\r\n        }\r\n    }\r\n}\r\n\r\n@Composable\r\nprivate fun SearchSection(onSearchClick: () -> Unit) {\r\n    Box(\r\n        modifier = Modifier\r\n            .fillMaxWidth()\r\n            .padding(16.dp)\r\n            .height(180.dp)\r\n            .clip(RoundedCornerShape(16.dp))\r\n    ) {\r\n        Image(\r\n            painter = painterResource(id = R.drawable.map_placeholder), // Pastikan ada gambar ini\r\n            contentDescription = \"Peta\",\r\n            modifier = Modifier.fillMaxSize(),\r\n            contentScale = ContentScale.Crop\r\n        )\r\n        Column(\r\n            modifier = Modifier\r\n                .fillMaxSize()\r\n                .padding(12.dp)\r\n        ) {\r\n            // Search Bar Palsu\r\n            Box(\r\n                modifier = Modifier\r\n                    .fillMaxWidth()\r\n                    .height(50.dp)\r\n                    .clip(CircleShape)\r\n                    .background(MaterialTheme.colorScheme.surface)\r\n                    .clickable { onSearchClick() }\r\n                    .padding(horizontal = 16.dp),\r\n                contentAlignment = Alignment.CenterStart\r\n            ) {\r\n                Row(verticalAlignment = Alignment.CenterVertically) {\r\n                    Icon(Icons.Default.Search, contentDescription = \"Cari\", tint = Color.Red)\r\n                    Spacer(modifier = Modifier.width(8.dp))\r\n                    Text(\"Cari lokasi tujuan\", color = Color.Gray)\r\n                }\r\n            }\r\n            Spacer(modifier = Modifier.height(12.dp))\r\n            // Tombol Rumah\r\n            Button(\r\n                onClick = { /* TODO */ },\r\n                shape = CircleShape,\r\n                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface),\r\n                contentPadding = PaddingValues(horizontal = 16.dp)\r\n            ) {\r\n                Icon(Icons.Default.Home, contentDescription = \"Rumah\", tint = Color.DarkGray)\r\n                Spacer(modifier = Modifier.width(4.dp))\r\n                Text(\"Rumah\", color = Color.Black)\r\n            }\r\n        }\r\n    }\r\n}\r\n\r\n@Composable\r\nprivate fun RecentLocationItem(location: LocationData) {\r\n    Row(\r\n        modifier = Modifier\r\n            .fillMaxWidth()\r\n            .background(MaterialTheme.colorScheme.surface)\r\n            .clickable { /* TODO */ }\r\n            .padding(horizontal = 16.dp, vertical = 12.dp),\r\n        verticalAlignment = Alignment.CenterVertically\r\n    ) {\r\n        Icon(Icons.Default.History, contentDescription = \"Riwayat\", tint = Color.Gray)\r\n        Spacer(modifier = Modifier.width(16.dp))\r\n        Column(modifier = Modifier.weight(1f)) {\r\n            Text(location.title, fontWeight = FontWeight.Bold)\r\n            Text(location.address, fontSize = 14.sp, color = Color.Gray, maxLines = 1)\r\n        }\r\n        Spacer(modifier = Modifier.width(16.dp))\r\n        Icon(Icons.Default.BookmarkBorder, contentDescription = \"Simpan\", tint = Color.Gray)\r\n    }\r\n}\r\n\r\n@Preview(showBackground = true, showSystemUi = true)\r\n@Composable\r\nprivate fun PassengerHomeDashboardPreview() {\r\n    val dummyUserName = \"Fawwaz\"\r\n    val dummyRecentLocations = listOf(\r\n        LocationData(\"Jl. Wayu No.48\", \"Jl. Wayu No.48, Cigimbal, Tritih Kulon, Kec...\"),\r\n        LocationData(\"Jalan Turi No. 61\", \"Jalan Turi No. 61, Lomanis, Cilacap Tengah,...\")\r\n    )\r\n\r\n    JekSoedTheme {\r\n        PassengerHomeScreenUI(\r\n            userName = dummyUserName,\r\n            recentLocations = dummyRecentLocations,\r\n            currentRoute = BottomNavItem.Home.screen_route, // Simulasi item \"Beranda\" aktif\r\n            onBottomNavItemClick = { }, // Di preview, aksi tidak melakukan apa-apa\r\n            onNotificationClick = {},\r\n            onSearchClick = {}\r\n        )\r\n    }\r\n}
+===================================================================
+diff --git a/app/src/main/java/com/example/jeksoed/ui/screens/passenger/PassengerHome.kt b/app/src/main/java/com/example/jeksoed/ui/screens/passenger/PassengerHome.kt
+--- a/app/src/main/java/com/example/jeksoed/ui/screens/passenger/PassengerHome.kt	(revision 0464c1caba409a99d0fb6ebb0f1664df31ee586d)
++++ b/app/src/main/java/com/example/jeksoed/ui/screens/passenger/PassengerHome.kt	(date 1758355007056)
+@@ -1,32 +1,52 @@
+ package com.example.jeksoed.ui.screens.passenger
+ 
+-import androidx.compose.foundation.Image
+ import androidx.compose.foundation.background
+ import androidx.compose.foundation.clickable
+-import androidx.compose.foundation.layout.*
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.PaddingValues
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.Spacer
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.width
+ import androidx.compose.foundation.lazy.LazyColumn
+ import androidx.compose.foundation.lazy.items
+ import androidx.compose.foundation.shape.CircleShape
+ import androidx.compose.foundation.shape.RoundedCornerShape
+ import androidx.compose.material.icons.Icons
+-import androidx.compose.material.icons.filled.*
+-import androidx.compose.material3.*
+-import androidx.compose.runtime.*
++import androidx.compose.material.icons.filled.BookmarkBorder
++import androidx.compose.material.icons.filled.History
++import androidx.compose.material.icons.filled.Home
++import androidx.compose.material.icons.filled.Notifications
++import androidx.compose.material.icons.filled.Search
++import androidx.compose.material3.Button
++import androidx.compose.material3.ButtonDefaults
++import androidx.compose.material3.ExperimentalMaterial3Api
++import androidx.compose.material3.Icon
++import androidx.compose.material3.IconButton
++import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.Scaffold
++import androidx.compose.material3.Text
++import androidx.compose.material3.TopAppBar
++import androidx.compose.material3.TopAppBarDefaults
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.getValue
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.draw.clip
+ import androidx.compose.ui.graphics.Color
+-import androidx.compose.ui.layout.ContentScale
+-import androidx.compose.ui.res.painterResource
+ import androidx.compose.ui.text.font.FontWeight
+ import androidx.compose.ui.tooling.preview.Preview
+ import androidx.compose.ui.unit.dp
+ import androidx.compose.ui.unit.sp
+ import androidx.navigation.NavController
+ import androidx.navigation.compose.currentBackStackEntryAsState
+-import com.example.jeksoed.R
+ import com.example.jeksoed.ui.components.BottomBar
+ import com.example.jeksoed.ui.components.BottomNavItem
++import com.example.jeksoed.ui.screens.passenger.LocationData
+ import com.example.jeksoed.ui.theme.JekSoedTheme
+ 
+ 
+@@ -96,7 +116,9 @@
+     Scaffold(
+         topBar = {
+             TopAppBar(
+-                title = { /* ... */ },
++                title = { Text(text = "Hallo, $userName",
++                    style = MaterialTheme.typography.headlineSmall,
++                    fontWeight = FontWeight.Bold) },
+                 actions = {
+                     IconButton(onClick = onNotificationClick) {
+                         Icon(Icons.Default.Notifications, contentDescription = "Notifikasi")
+@@ -123,13 +145,12 @@
+             item {
+                 Column(Modifier.background(MaterialTheme.colorScheme.surface)) {
+                     GreetingSection(name = userName)
+-                    PromoCard()
+                     SearchSection(onSearchClick = onSearchClick)
+                 }
+             }
+             item {
+                 Text(
+-                    text = "Tujuan Terakhir",
++                    text = "Baru-baru ini...",
+                     style = MaterialTheme.typography.titleMedium,
+                     fontWeight = FontWeight.Bold,
+                     modifier = Modifier.padding(start = 16.dp, top = 24.dp, bottom = 8.dp)
+@@ -181,36 +202,6 @@
+     }
+ }
+ 
+-@Composable
+-private fun PromoCard() {
+-    Card(
+-        modifier = Modifier
+-            .fillMaxWidth()
+-            .padding(horizontal = 16.dp),
+-        shape = RoundedCornerShape(16.dp),
+-        colors = CardDefaults.cardColors(containerColor = Color(0xFFEFFFF0)),
+-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+-    ) {
+-        Row(
+-            modifier = Modifier.padding(16.dp),
+-            verticalAlignment = Alignment.CenterVertically
+-        ) {
+-            Icon(
+-                painter = painterResource(id = R.drawable.ic_launcher_foreground), // Ganti dengan ikon yang sesuai
+-                contentDescription = "Promo",
+-                tint = Color(0xFF00880C),
+-                modifier = Modifier.size(40.dp)
+-            )
+-            Spacer(modifier = Modifier.width(12.dp))
+-            Column {
+-                Text("Maw HEMAT setiap hari?", fontWeight = FontWeight.Bold)
+-                Text("Let's GoRide Hemat! Ke mana aja selalu diskon~", fontSize = 14.sp)
+-            }
+-            Spacer(modifier = Modifier.weight(1f))
+-            Icon(Icons.Default.ArrowForwardIos, contentDescription = null, modifier = Modifier.size(16.dp))
+-        }
+-    }
+-}
+ 
+ @Composable
+ private fun SearchSection(onSearchClick: () -> Unit) {
+@@ -221,12 +212,6 @@
+             .height(180.dp)
+             .clip(RoundedCornerShape(16.dp))
+     ) {
+-        Image(
+-            painter = painterResource(id = R.drawable.map_placeholder), // Pastikan ada gambar ini
+-            contentDescription = "Peta",
+-            modifier = Modifier.fillMaxSize(),
+-            contentScale = ContentScale.Crop
+-        )
+         Column(
+             modifier = Modifier
+                 .fillMaxSize()
+@@ -292,7 +277,10 @@
+     val dummyUserName = "Fawwaz"
+     val dummyRecentLocations = listOf(
+         LocationData("Jl. Wayu No.48", "Jl. Wayu No.48, Cigimbal, Tritih Kulon, Kec..."),
+-        LocationData("Jalan Turi No. 61", "Jalan Turi No. 61, Lomanis, Cilacap Tengah,...")
++        LocationData("Jalan Turi No. 61", "Jalan Turi No. 61, Lomanis, Cilacap Tengah,..."),
++        LocationData("dr. H. Marwanto", "Jl. Gatot Subroto No.198, Klempang, Gunu..."),
++        LocationData("jalan mt haryono no 194", "Jl. MT. Haryono No.194, Rawakeong, Loma...")
++
+     )
+ 
+     JekSoedTheme {

@@ -30,23 +30,33 @@ android {
             )
         }
     }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-    kotlinOptions {
-        jvmTarget = "11"
+    kotlin {
+        jvmToolchain {
+            (this as JavaToolchainSpec).languageVersion.set(JavaLanguageVersion.of(17))
+        }
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
 dependencies {
-
+    // Untuk memanggil API (Retrofit)
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.material)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.material3)
+    implementation(libs.androidx.ui)
+    implementation(libs.androidx.ui.graphics)
+    implementation(libs.androidx.ui.tooling.preview)
+    implementation(libs.androidx.activity.compose)
     val composeBom = platform("androidx.compose:compose-bom:2025.08.00")
     implementation(composeBom)
     androidTestImplementation(composeBom)
+    implementation("com.google.android.material:material:1.13.0")
     // Material Design 3
     implementation("androidx.compose.material3:material3")
     // Android Studio Preview support
@@ -63,7 +73,7 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
-//    implementation(platform("com.google.firebase:firebase-bom:34.2.0"))
+//    implementation(platform("com.google.firebase:firebase-bom:34.3.0"))
     implementation("com.google.firebase:firebase-auth-ktx:23.2.1")
     implementation("com.google.firebase:firebase-firestore-ktx:25.1.4")
     implementation("com.google.firebase:firebase-analytics-ktx:22.5.0")
@@ -85,4 +95,13 @@ dependencies {
     implementation("com.google.maps:google-maps-services:2.2.0")
     implementation("org.slf4j:slf4j-simple:1.7.36")
     implementation("com.google.maps.android:android-maps-utils:3.8.0")
+    implementation("androidx.compose.material:material-icons-extended:1.7.0")
+    implementation("com.google.firebase:firebase-messaging-ktx:24.0.1")
+    // Tambahkan ini untuk animasi navigasi
+    implementation("com.google.accompanist:accompanist-navigation-animation:0.32.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+    implementation("com.google.firebase:firebase-storage-ktx:21.0.0")
+    implementation("io.coil-kt:coil-compose:2.6.0")
+
 }

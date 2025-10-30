@@ -1,46 +1,241 @@
 package com.example.jeksoed.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.lifecycle.ViewModel
+import androidx.navigation.NavController
+import androidx.navigation.NavGraphBuilder
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.jeksoed.ui.splash.SplashScreen
-import com.example.jeksoed.ui.auth.LoginScreen
-import com.example.jeksoed.ui.auth.RegisterScreen
-import com.example.jeksoed.ui.passenger.PassengerHomeScreen
-import com.example.jeksoed.ui.driver.DriverHomeScreen
-import com.example.jeksoed.ui.passenger.FindingDriverScreen
+import androidx.navigation.navArgument
+import com.example.jeksoed.ui.screens.auth.CtaScreen
+import com.example.jeksoed.ui.screens.auth.ForgotPasswordScreen
+import com.example.jeksoed.ui.screens.auth.LoginScreen
+import com.example.jeksoed.ui.screens.auth.RegisterPassengerScreen
+import com.example.jeksoed.ui.screens.auth.RoleSelectionScreen
+import com.example.jeksoed.ui.screens.auth.TncScreen
+import com.example.jeksoed.ui.screens.chat.ChatScreen
+import com.example.jeksoed.ui.screens.passenger.FindingDriverScreen
+import com.example.jeksoed.ui.screens.passenger.OrderScreen
+import com.example.jeksoed.ui.screens.passenger.PassengerMainScreen
+import com.example.jeksoed.ui.screens.rating.RatingScreen
+import com.example.jeksoed.ui.screens.splash.SplashScreen
+import com.example.jeksoed.ui.screens.trip.TripScreen
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.compose.navigation
+import com.example.jeksoed.ui.screens.activity.ActivityDetailScreen
+import com.example.jeksoed.ui.screens.auth.RegisterDriverStep1Screen
+import com.example.jeksoed.ui.screens.auth.RegisterDriverStep2Screen
+import com.example.jeksoed.ui.screens.auth.RegisterDriverStep3Screen
+import com.example.jeksoed.ui.screens.auth.RegisterDriverViewModel
+import com.example.jeksoed.ui.screens.chat.ChatViewModelFactory
+import com.example.jeksoed.ui.screens.driver.AllOrdersScreen
+import com.example.jeksoed.ui.screens.driver.DriverHomeViewModel
+import com.example.jeksoed.ui.screens.driver.DriverMainScreen
+import com.example.jeksoed.ui.screens.passenger.EditProfileScreen
+import com.example.jeksoed.ui.screens.trip.TripCompletedScreen
 
+// Sealed class Screen tidak perlu diubah
 sealed class Screen(val route: String) {
     object Splash : Screen("splash")
     object Login : Screen("login")
-    object Register : Screen("register")
-    object PassengerHome : Screen("passenger_home")
-    object DriverHome : Screen("driver_home")
+    object Cta : Screen("cta")
+    object Register : Screen("register/{role}") {
+        fun createRoute(role: String) = "register/$role"
+    }
+    object RegisterDriverGraph : Screen("register_driver_graph") // <-- GRAF NAVIGASI BARU
+    object RegisterDriverStep1 : Screen("register_driver_1")
+    object RegisterDriverStep2 : Screen("register_driver_2")
+    object RegisterDriverStep3 : Screen("register_driver_3")
+    object RoleSelection : Screen("role_selection")
+    object Tnc : Screen("tnc")
+    object ForgotPassword : Screen("forgot_password")
+    object PassengerMain : Screen("passenger_main")
+    object CreateOrder : Screen("create_order")
+    object DriverMain : Screen("driver_main")
     object FindingDriver : Screen("finding_driver/{rideRequestId}") {
         fun createRoute(rideRequestId: String) = "finding_driver/$rideRequestId"
     }
+    object Trip : Screen("trip/{rideRequestId}") {
+        fun createRoute(rideRequestId: String) = "trip/$rideRequestId"
+    }
+    object TripCompleted : Screen("trip_completed/{rideRequestId}") {
+        fun createRoute(rideRequestId: String) = "trip_completed/$rideRequestId"
+    }
+
+    object Rating : Screen("rating/{driverId}/{rideRequestId}") {
+        fun createRoute(driverId: String, rideRequestId: String) = "rating/$driverId/$rideRequestId"
+    }
+    object Chat : Screen("chat/{rideRequestId}") {
+        fun createRoute(rideRequestId: String) = "chat/$rideRequestId"
+    }
+    object ActivityDetail : Screen("activity_detail/{rideRequestId}") {
+        fun createRoute(rideRequestId: String) = "activity_detail/$rideRequestId"
+    }
+    object EditProfile : Screen("edit_profile")
+    object AllOrders : Screen("all_orders")
 }
+
 
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
+    val driverHomeViewModel: DriverHomeViewModel = viewModel()
+
     NavHost(navController, startDestination = Screen.Splash.route) {
         composable(Screen.Splash.route) { SplashScreen(navController) }
+        composable(Screen.Cta.route) { CtaScreen(navController) }
         composable(Screen.Login.route) { LoginScreen(navController) }
-        composable(Screen.Register.route) { RegisterScreen(navController) }
-        composable(Screen.PassengerHome.route) { PassengerHomeScreen(navController) }
-        composable(Screen.DriverHome.route) { DriverHomeScreen(navController) }
+        composable(Screen.RoleSelection.route) { RoleSelectionScreen(navController) }
+        composable(Screen.Tnc.route) { TncScreen(navController) }
+        composable(Screen.ForgotPassword.route) { ForgotPasswordScreen(navController) }
+        composable(Screen.EditProfile.route) {
+            EditProfileScreen(navController = navController)
+        }
+
+        // --- HANYA SATU BLOK COMPOSABLE UNTUK REGISTER ---
+        composable(
+            route = Screen.Register.route,
+            arguments = listOf(navArgument("role") { type = NavType.StringType })
+        ) { backStackEntry ->
+            RegisterPassengerScreen(navController = navController)
+        }
+
+        // --- TAMBAHKAN NESTED NAVIGATION GRAPH UNTUK REGISTRASI DRIVER ---
+        driverRegistrationGraph(navController)
+
+
+        composable(Screen.PassengerMain.route) { PassengerMainScreen(navController) }
+        composable(Screen.DriverMain.route) {
+            DriverMainScreen(navController)
+        }
+
+        composable(
+            route = Screen.CreateOrder.route,
+            enterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { fullWidth -> fullWidth },
+                    animationSpec = tween(300)
+                )
+            },
+            exitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { fullWidth -> -fullWidth },
+                    animationSpec = tween(300)
+                )
+            },
+            popEnterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { fullWidth -> -fullWidth },
+                    animationSpec = tween(300)
+                )
+            },
+            popExitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { fullWidth -> fullWidth },
+                    animationSpec = tween(300)
+                )
+            }
+        ) {
+            OrderScreen(navController)
+        }
+
         composable(Screen.FindingDriver.route) { backStackEntry ->
             val rideRequestId = backStackEntry.arguments?.getString("rideRequestId")
             if (rideRequestId != null) {
                 FindingDriverScreen(navController = navController, rideRequestId = rideRequestId)
             } else {
-                // Handle kasus jika ID tidak ada, misal kembali ke login
                 navController.navigate(Screen.Login.route) {
                     popUpTo(navController.graph.startDestinationId) { inclusive = true }
                 }
             }
         }
+        composable(Screen.Trip.route) {
+            // Kita perlu meneruskan rideRequestId ke TripScreen
+            val rideRequestId = it.arguments?.getString("rideRequestId") ?: ""
+            TripScreen(navController = navController, rideRequestId = rideRequestId)
+        }
+        composable(
+            route = Screen.TripCompleted.route,
+            arguments = listOf(navArgument("rideRequestId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val rideRequestId = backStackEntry.arguments?.getString("rideRequestId") ?: ""
+            TripCompletedScreen(navController = navController, rideRequestId = rideRequestId)
+        }
+        composable(
+            route = Screen.Rating.route,
+            arguments = listOf(
+                navArgument("driverId") { type = NavType.StringType },
+                navArgument("rideRequestId") { type = NavType.StringType } // Tambahkan argumen ini
+            )
+        ) { backStackEntry ->
+            val driverId = backStackEntry.arguments?.getString("driverId")!!
+            val rideRequestId = backStackEntry.arguments?.getString("rideRequestId")!! // Ambil argumen
+            RatingScreen(
+                navController = navController,
+                driverId = driverId,
+                rideRequestId = rideRequestId // Teruskan ke screen
+            )
+        }
+        composable(Screen.Chat.route) { backStackEntry ->
+            val rideRequestId = backStackEntry.arguments?.getString("rideRequestId")
+            if (rideRequestId != null) {
+                ChatScreen(
+                    navController = navController,
+                    rideRequestId = rideRequestId,
+                    viewModel = viewModel(factory = ChatViewModelFactory(rideRequestId))
+                )
+            }
+        }
+        composable(
+            route = Screen.ActivityDetail.route,
+            arguments = listOf(navArgument("rideRequestId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val rideRequestId = backStackEntry.arguments?.getString("rideRequestId") ?: ""
+            ActivityDetailScreen(navController = navController, rideRequestId = rideRequestId)
+        }
+        composable(Screen.AllOrders.route) {
+            AllOrdersScreen(navController, viewModel = driverHomeViewModel)
+        }
     }
 }
+fun NavGraphBuilder.driverRegistrationGraph(navController: NavController) {
+    navigation(startDestination = Screen.RegisterDriverStep1.route, route = Screen.RegisterDriverGraph.route) {
+        composable(Screen.RegisterDriverStep1.route) {
+            val viewModel = it.sharedViewModel<RegisterDriverViewModel>(navController)
+            RegisterDriverStep1Screen(navController = navController, viewModel = viewModel)
+        }
+        composable(Screen.RegisterDriverStep2.route) {
+            val viewModel = it.sharedViewModel<RegisterDriverViewModel>(navController)
+            RegisterDriverStep2Screen(navController = navController, viewModel = viewModel)
+        }
+        composable(Screen.RegisterDriverStep3.route) {
+            val viewModel = it.sharedViewModel<RegisterDriverViewModel>(navController)
+            RegisterDriverStep3Screen(navController = navController, viewModel = viewModel)
+        }
+    }
+}
+
+// Fungsi helper untuk berbagi ViewModel di dalam nested graph
+@Composable
+inline fun <reified T : ViewModel> androidx.navigation.NavBackStackEntry.sharedViewModel(
+    navController: NavController,
+): T {
+    val navGraphRoute = destination.parent?.route ?: return viewModel()
+    val parentEntry = remember(this) {
+        navController.getBackStackEntry(navGraphRoute)
+    }
+    return viewModel(parentEntry)
+}
+
+
+
+
+
+
+
