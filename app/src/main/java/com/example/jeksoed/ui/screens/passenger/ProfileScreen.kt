@@ -90,7 +90,7 @@ fun ProfileScreenUI(
     onLogoutClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
-    val profileImageSize = 150.dp
+    val profileImageSize = 140.dp
     val yellowColor = Color(0xFFFFD803)
 
     Column(
@@ -100,7 +100,7 @@ fun ProfileScreenUI(
     ) {
         // --- PERMINTAAN 1: Judul "Profile" di area putih terpisah ---
         Surface( // Surface memberi background putih dan elevasi (shadow)
-            modifier = Modifier.fillMaxWidth().statusBarsPadding(),
+            modifier = Modifier.fillMaxWidth(),
             color = Color.White,
             shadowElevation = 4.dp // Shadow tipis di bawah
         ) {
@@ -117,7 +117,7 @@ fun ProfileScreenUI(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(210.dp), // <-- SEBELUMNYA 180.dp
+                .height(190.dp), // <-- SEBELUMNYA 180.dp
             contentAlignment = Alignment.TopStart
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
@@ -166,7 +166,7 @@ fun ProfileScreenUI(
                         Spacer(modifier = Modifier.height(profileImageSize / 2))
                         Text(uiState.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         Text(uiState.email, style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
                         ProfileMenuItem(
                             icon = Icons.Default.Person,
@@ -186,10 +186,7 @@ fun ProfileScreenUI(
                     contentScale = ContentScale.Crop
                 )
             }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Info Card
+            Spacer(modifier = Modifier.height(8.dp))
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(24.dp),
@@ -197,14 +194,19 @@ fun ProfileScreenUI(
                 elevation = CardDefaults.cardElevation(4.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Tentang JEKSOED", modifier = Modifier.clickable(onClick = onAboutClick).padding(vertical = 12.dp))
-                    HorizontalDivider()
-                    Text("Ketentuan Syarat dan Privasi", modifier = Modifier.clickable(onClick = onTncClick).padding(vertical = 12.dp))
+                    Text("Tentang JEKSOED", modifier = Modifier.clickable(onClick = onAboutClick))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    Text("Ketentuan Syarat dan Privasi", modifier = Modifier.clickable(onClick = onTncClick))
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp)) // <-- Ganti dengan tinggi tetap
-
-            // Tombol Aksi
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             OutlinedButton(
                 onClick = onLogoutClick,
                 modifier = Modifier.fillMaxWidth(),
@@ -222,11 +224,9 @@ fun ProfileScreenUI(
             ) {
                 Text("Hapus Akun", color = Color.Red)
             }
-            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
-
 
 @Composable
 fun ProfileMenuItem(icon: ImageVector, text: String, onClick: () -> Unit) {
