@@ -39,10 +39,9 @@ import com.google.android.libraries.places.api.net.PlacesClient
 @Composable
 fun SearchStage(
     uiState: OrderUiState,
-    viewModel: OrderViewModel?,
+    viewModel: OrderViewModel,
     placesClient: PlacesClient?,
     onTextFieldFocus: () -> Unit,
-    // --- TAMBAHKAN DUA PARAMETER INI ---
     context: Context,
     apiKey: String
 ) {
@@ -88,13 +87,22 @@ fun SearchStage(
                         focusManager.clearFocus()
                         if (placesClient != null) {
                             // --- PERBAIKAN: Tambahkan context dan apiKey ---
-                            viewModel?.selectPrediction(prediction, placesClient, context, apiKey)
+                            viewModel.selectPrediction(prediction, placesClient, context, apiKey)
                         }
                     }
                 }
             }
         } else {
-            TersimpanSection(places = uiState.savedPlaces)
+            TersimpanSection(
+                places = uiState.savedPlaces,
+                onPlaceClick = { place ->
+                    focusManager.clearFocus()
+                    if (placesClient != null) {
+                        // Panggil fungsi baru di ViewModel
+                        viewModel.selectSavedPlace(place, placesClient, context, apiKey)
+                    }
+                }
+            )
         }
     }
 }
@@ -183,9 +191,12 @@ fun PredictionItem(prediction: AutocompletePrediction, onClick: () -> Unit) {
 }
 
 
-// --- COMPOSABLE BARU UNTUK SECTION TERSIMPAN ---
+//  SECTION TERSIMPAN ---
 @Composable
-fun TersimpanSection(places: List<SavedPlace>) {
+fun TersimpanSection(
+    places: List<SavedPlace>,
+    onPlaceClick: (SavedPlace) -> Unit
+    ) {
     Column(modifier = Modifier.padding(top = 24.dp)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -204,7 +215,7 @@ fun TersimpanSection(places: List<SavedPlace>) {
         HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), thickness = DividerDefaults.Thickness, color = DividerDefaults.color)
         LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             items(places) { place ->
-                SavedPlaceItem(place = place)
+                SavedPlaceItem(place = place, onClick = { onPlaceClick(place) })
             }
             item {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), thickness = DividerDefaults.Thickness, color = DividerDefaults.color)
@@ -214,10 +225,11 @@ fun TersimpanSection(places: List<SavedPlace>) {
 }
 
 @Composable
-fun SavedPlaceItem(place: SavedPlace) {
+fun SavedPlaceItem(place: SavedPlace, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -255,60 +267,60 @@ fun SavedPlaceItem(place: SavedPlace) {
 
 
 // --- PREVIEWS (Tidak perlu diubah) ---
-@Preview(name = "Search Stage - Default", showBackground = true)
-@Composable
-private fun SearchStagePreview() {
-    JekSoedTheme {
-        SearchStage(
-            uiState = OrderUiState(
-                stage = OrderStage.SEARCHING,
-                pickupQuery = "Lokasi saat ini",
-                savedPlaces = listOf(
-                    SavedPlace("RITA SuperMall Purwokerto", "Jl. Jend. Sudirman No.296, Pereng...", "3.6 Km")
-                )
-            ),
-            viewModel = null,
-            placesClient = null,
-            onTextFieldFocus = {},
-            context = LocalContext.current,
-            apiKey = ""
-        )
-    }
-}
+//@Preview(name = "Search Stage - Default", showBackground = true)
+//@Composable
+//private fun SearchStagePreview() {
+//    JekSoedTheme {
+//        SearchStage(
+//            uiState = OrderUiState(
+//                stage = OrderStage.SEARCHING,
+//                pickupQuery = "Lokasi saat ini",
+//                savedPlaces = listOf(
+//                    SavedPlace("RITA SuperMall Purwokerto", "Jl. Jend. Sudirman No.296, Pereng...", "3.6 Km")
+//                )
+//            ),
+//            viewModel = null,
+//            placesClient = null,
+//            onTextFieldFocus = {},
+//            context = LocalContext.current,
+//            apiKey = ""
+//        )
+//    }
+//}
 
-@Preview(name = "Search Stage - Custom Pickup", showBackground = true)
-@Composable
-private fun SearchStage_CustomPickupPreview() {
-    JekSoedTheme {
-        SearchStage(
-            uiState = OrderUiState(
-                stage = OrderStage.SEARCHING,
-                pickupQuery = "" // Teks jemputan kosong
-            ),
-            viewModel = null,
-            placesClient = null,
-            onTextFieldFocus = {},
-            context = LocalContext.current,
-            apiKey = ""
-        )
-    }
-}
-
-@Preview(name = "Search Stage - Typing", showBackground = true)
-@Composable
-private fun SearchStage_TypingPreview() {
-    JekSoedTheme {
-        SearchStage(
-            uiState = OrderUiState(
-                stage = OrderStage.SEARCHING,
-                pickupQuery = "Jepang",
-                destinationQuery = "Moro Mall Purwokerto"
-            ),
-            viewModel = null,
-            placesClient = null,
-            onTextFieldFocus = {},
-            context = LocalContext.current,
-            apiKey = ""
-        )
-    }
-}
+//@Preview(name = "Search Stage - Custom Pickup", showBackground = true)
+//@Composable
+//private fun SearchStage_CustomPickupPreview() {
+//    JekSoedTheme {
+//        SearchStage(
+//            uiState = OrderUiState(
+//                stage = OrderStage.SEARCHING,
+//                pickupQuery = "" // Teks jemputan kosong
+//            ),
+//            viewModel = null,
+//            placesClient = null,
+//            onTextFieldFocus = {},
+//            context = LocalContext.current,
+//            apiKey = ""
+//        )
+//    }
+//}
+//
+//@Preview(name = "Search Stage - Typing", showBackground = true)
+//@Composable
+//private fun SearchStage_TypingPreview() {
+//    JekSoedTheme {
+//        SearchStage(
+//            uiState = OrderUiState(
+//                stage = OrderStage.SEARCHING,
+//                pickupQuery = "Jepang",
+//                destinationQuery = "Moro Mall Purwokerto"
+//            ),
+//            viewModel = null,
+//            placesClient = null,
+//            onTextFieldFocus = {},
+//            context = LocalContext.current,
+//            apiKey = ""
+//        )
+//    }
+//}

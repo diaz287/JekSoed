@@ -349,34 +349,34 @@ fun PickupMarkerComposable(photoUrl: String?) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Preview(showSystemUi = true, showBackground = true)
-@Composable
-private fun OrderScreenPreview() {
-    JekSoedTheme {
-        val dummyUiState = OrderUiState(stage = OrderStage.SEARCHING)
-        val cameraPositionState = rememberCameraPositionState {
-            position = CameraPosition.fromLatLngZoom(LatLng(-7.432, 109.244), 15f)
-        }
-        val bottomSheetState = rememberBottomSheetScaffoldState()
-
-        OrderScreenLayout(
-            uiState = dummyUiState,
-            userLocation = LatLng(-7.432, 109.244),
-            cameraPositionState = cameraPositionState,
-            bottomSheetState = bottomSheetState,
-            sheetPeekHeight = 400.dp,
-            onBackClick = {},
-            sheetContent = {
-                SearchStage(
-                    uiState = dummyUiState,
-                    viewModel = null,
-                    placesClient = null,
-                    onTextFieldFocus = {},
-                    context = LocalContext.current,
-                    apiKey = ""
-                )
-            }
-        )
-    }
-}
+//@OptIn(ExperimentalMaterial3Api::class)
+//@Preview(showSystemUi = true, showBackground = true)
+//@Composable
+//private fun OrderScreenPreview() {
+//    JekSoedTheme {
+//        val dummyUiState = OrderUiState(stage = OrderStage.SEARCHING)
+//        val cameraPositionState = rememberCameraPositionState {
+//            position = CameraPosition.fromLatLngZoom(LatLng(-7.432, 109.244), 15f)
+//        }
+//        val bottomSheetState = rememberBottomSheetScaffoldState()
+//
+//        OrderScreenLayout(
+//            uiState = dummyUiState,
+//            userLocation = LatLng(-7.432, 109.244),
+//            cameraPositionState = cameraPositionState,
+//            bottomSheetState = bottomSheetState,
+//            sheetPeekHeight = 400.dp,
+//            onBackClick = {},
+//            sheetContent = {
+//                SearchStage(
+//                    uiState = dummyUiState,
+//                    viewModel = null,
+//                    placesClient = null,
+//                    onTextFieldFocus = {},
+//                    context = LocalContext.current,
+//                    apiKey = ""
+//                )
+//            }
+//        )
+//    }
+//}

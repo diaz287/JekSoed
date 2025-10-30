@@ -34,7 +34,8 @@ import kotlinx.coroutines.withContext
 data class SavedPlace(
     val title: String,
     val address: String,
-    val distance: String
+    val distance: String,
+    val placeId: String
 )
 
 enum class OrderStage {
@@ -88,13 +89,22 @@ class OrderViewModel : ViewModel() {
     private var searchJob: Job? = null
     private var activeRideListener: ListenerRegistration? = null
 
-    // --- PERBAIKAN: Menggabungkan kedua blok init ---
     init {
         fetchCurrentUserData()
 
         val dummySavedPlaces = listOf(
-            SavedPlace("RITA SuperMall Purwokerto", "Jl. Jend. Sudirman No.296, Pereng, Sokanegara, Kec. Purwokerto Tim., Kabupaten Banyumas", "3.6 Km"),
-            SavedPlace("RSU Wiradadi Husada", "Jl. Menteri Supeno No.25, Dusun I Wiradadi, Kec. Sokaraja, Kabupaten Banyumas", "3.6 Km")
+            SavedPlace(
+                title = "RITA SuperMall Purwokerto",
+                address = "Jl. Jend. Sudirman No.296, Pereng, Sokanegara, Kec. Purwokerto Tim., Kabupaten Banyumas",
+                distance = "3.6 Km",
+                placeId = "ChIJ82-b1T-9LS4R_L8TCAjZ1zE"
+            ),
+            SavedPlace(
+                title = "RSU Wiradadi Husada",
+                address = "Jl. Menteri Supeno No.25, Dusun I Wiradadi, Kec. Sokaraja, Kabupaten Banyumas",
+                distance = "3.6 Km",
+                placeId = "ChIJb6t8jAGALS4RmR-nwpE9Aaw"
+            )
         )
         val dummyDriverLocations = listOf(
             LatLng(-7.430, 109.246),
@@ -138,6 +148,38 @@ class OrderViewModel : ViewModel() {
 
     fun setUserLocationAsPickup(location: LatLng) {
         _uiState.update { it.copy(pickupLocation = location, pickupQuery = "Lokasi saat ini", pickupAddress = "Menggunakan lokasi Anda saat ini") }
+    }
+
+    fun selectSavedPlace(place: SavedPlace, placesClient: PlacesClient, context: Context, apiKey: String) {
+        viewModelScope.launch {
+            try {
+                // Ambil detail (LatLng) menggunakan placeId
+                val request = FetchPlaceRequest.newInstance(place.placeId, listOf(Place.Field.LAT_LNG, Place.Field.NAME, Place.Field.ADDRESS))
+                val response = placesClient.fetchPlace(request).await()
+                val location = response.place.latLng ?: return@launch
+                val name = response.place.name ?: place.title
+                val address = response.place.address ?: place.address
+
+                // Langsung set sebagai DESTINASI
+                _uiState.update {
+                    it.copy(
+                        destinationLocation = location,
+                        destinationQuery = name,
+                        predictions = emptyList(), // Bersihkan prediksi
+                        isSearchingDestination = false,
+                        isSearchingPickup = false
+                    )
+                }
+
+                // Jika lokasi jemput sudah ada, langsung ke konfirmasi
+                if (_uiState.value.pickupLocation != null) {
+                    _uiState.update { it.copy(stage = OrderStage.PICKUP_CONFIRM) }
+                }
+
+            } catch (e: Exception) {
+                Log.e("OrderViewModel", "Gagal fetch place details untuk saved place", e)
+            }
+        }
     }
 
     fun selectPrediction(prediction: AutocompletePrediction, placesClient: PlacesClient, context: Context, apiKey: String) {
