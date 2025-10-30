@@ -60,7 +60,7 @@ fun TncScreen(navController: NavController) {
             )
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text("2. Penggunaan Aplikasi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("2. Penggunaan Aplikasi", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "• Jeksoed hanya diperuntukkan bagi mahasiswa Unsoed.",
@@ -80,7 +80,7 @@ fun TncScreen(navController: NavController) {
             )
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text("3. Privasi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("3. Privasi", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "• Data pengguna akan dijaga sesuai dengan kebijakan privasi Jeksoed.",
@@ -92,7 +92,7 @@ fun TncScreen(navController: NavController) {
             )
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text("4. Perubahan Ketentuan", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("4. Perubahan Ketentuan", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "Jeksoed berhak memperbarui Syarat & Ketentuan kapan saja. Perubahan akan diumumkan melalui aplikasi.",
