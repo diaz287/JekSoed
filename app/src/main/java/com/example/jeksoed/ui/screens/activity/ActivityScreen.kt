@@ -3,6 +3,7 @@
 package com.example.jeksoed.ui.screens.activity
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -50,7 +52,7 @@ fun ActivityScreen(
 
         // Tabs
         val tabs = listOf("Semua", "Selesai", "Dibatalkan")
-        TabRow(selectedTabIndex = uiState.selectedTab) {
+        TabRow(selectedTabIndex = uiState.selectedTab, ) {
             tabs.forEachIndexed { index, title ->
                 Tab(
                     selected = uiState.selectedTab == index,
@@ -113,20 +115,30 @@ fun HistoryItemCard(
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(formattedDate, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(formattedDate, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(statusText, color = statusColor, fontWeight = FontWeight.Bold)
+            }
             Spacer(modifier = Modifier.height(16.dp))
 
-            Row(modifier = Modifier.fillMaxWidth()) {
+            Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),) {
                 // Rute
                 Column(modifier = Modifier.weight(1.5f)) {
                     RouteRow(iconRes = R.drawable.blue_icon, location = ride.pickupName ?: "Lokasi Jemput")
                     Spacer(modifier = Modifier.height(8.dp))
                     RouteRow(iconRes = R.drawable.locatio_icon, location = ride.destinationName ?: "Lokasi Tujuan")
                 }
+
+                Spacer(modifier = Modifier.width(16.dp))
+                VerticalDivider(
+                    modifier = Modifier.fillMaxHeight(),
+                    thickness = 1.dp,
+                    color = Color.LightGray
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+
                 // Info
-                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                    Text(statusText, color = statusColor, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(8.dp))
+                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
 
                     Text(if (isDriverView) "Penumpang" else "Driver", color = Color.Gray)
                     Text(historyItem.otherUserName, fontWeight = FontWeight.SemiBold)
@@ -137,7 +149,12 @@ fun HistoryItemCard(
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
-            Text("Detail Pesanan >", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally))
+            Text(
+                "Detail Pesanan >",
+                color = colorResource(id = R.color.unsoed_dark), // <-- PERBAIKAN DI SINI
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.End)
+            )
         }
     }
 }
@@ -202,12 +219,12 @@ private fun HistoryScreenPreview() {
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(painter = painterResource(id = R.drawable.maps_icon), contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
+                Icon(painter = painterResource(id = R.drawable.motor_icon), contentDescription = null, tint = Color.Unspecified)
+                Spacer(modifier = Modifier.width(12.dp))
                 Text("Riwayat Aktivitas", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             }
 
-            TabRow(selectedTabIndex = 0) {
+            TabRow(selectedTabIndex = 0, modifier = Modifier.border(1.dp, color = Color.LightGray)) {
                 Tab(selected = true, onClick = {}, text = { Text("Semua") })
                 Tab(selected = false, onClick = {}, text = { Text("Selesai") })
                 Tab(selected = false, onClick = {}, text = { Text("Dibatalkan") })
